@@ -38,9 +38,11 @@ export class GameComponent implements OnInit {
     let star: any;
     let scoreText: any;
     
-    // --- STRICT LOCK VARIABLE (TALA) ---
-    // Ye batayega ki coin utha sakte hain ya nahi
-    let canCollect = true;
+    // Touch Control Variables
+    let isTouchLeft = false;
+    let isTouchRight = false;
+    let isTouchUp = false;
+    let isTouchDown = false;
 
     let winText: any = null;
     let subText: any = null;
@@ -51,6 +53,11 @@ export class GameComponent implements OnInit {
       width: 800,
       height: 600,
       parent: 'game-container',
+      // --- MOBILE FIT: Phone screen par sahi dikhne ke liye ---
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      },
       physics: {
         default: 'arcade',
         arcade: { gravity: { x: 0, y: 0 }, debug: false }
@@ -69,6 +76,40 @@ export class GameComponent implements OnInit {
               socket.emit('requestPlayers');
           });
 
+          // --- TOUCH BUTTONS (Phone Controls) ---
+          const createBtn = (x: number, y: number, text: string) => {
+              let btn = self.add.text(x, y, text, { fontSize: '60px', backgroundColor: '#333', padding: { x: 10, y: 10 } })
+                .setScrollFactor(0)
+                .setInteractive();
+              return btn;
+          };
+
+          // Buttons banayein (Neeche Left/Right/Up/Down)
+          // Left Side Controls
+          const btnLeft = createBtn(50, 500, '⬅️');
+          const btnRight = createBtn(200, 500, '➡️');
+          // Right Side Controls
+          const btnUp = createBtn(600, 420, '⬆️');
+          const btnDown = createBtn(600, 520, '⬇️');
+
+          // Touch Events Handlers
+          btnLeft.on('pointerdown', () => isTouchLeft = true);
+          btnLeft.on('pointerup', () => isTouchLeft = false);
+          btnLeft.on('pointerout', () => isTouchLeft = false);
+
+          btnRight.on('pointerdown', () => isTouchRight = true);
+          btnRight.on('pointerup', () => isTouchRight = false);
+          btnRight.on('pointerout', () => isTouchRight = false);
+
+          btnUp.on('pointerdown', () => isTouchUp = true);
+          btnUp.on('pointerup', () => isTouchUp = false);
+          btnUp.on('pointerout', () => isTouchUp = false);
+
+          btnDown.on('pointerdown', () => isTouchDown = true);
+          btnDown.on('pointerup', () => isTouchDown = false);
+          btnDown.on('pointerout', () => isTouchDown = false);
+
+
           // --- WALLS ---
           walls = self.physics.add.staticGroup();
           const createWall = (x: number, y: number, w: number, h: number) => {
@@ -86,7 +127,6 @@ export class GameComponent implements OnInit {
           star = self.add.circle(-100, -100, 15, 0xffff00);
           self.physics.add.existing(star);
 
-          // Backend se naya coin aane par Lock kholo
           socket.on('starLocation', (location: any) => {
              if (!star || !star.scene) {
                  star = self.add.circle(location.x, location.y, 15, 0xffff00);
@@ -99,9 +139,6 @@ export class GameComponent implements OnInit {
                  star.body.enable = true;
                  star.body.reset(location.x, location.y);
              }
-             
-             // --- LOCK KHOL DO (Ab naya coin utha sakte hain) ---
-             canCollect = true;
           });
 
           socket.emit('requestStar');
@@ -124,21 +161,17 @@ export class GameComponent implements OnInit {
           socket.on('gameOver', (winnerId: string) => {
             self.physics.pause();
             if(star) star.destroy(); 
-            
             let resultText = (winnerId === socket.id) ? 'YOU WIN! 🏆' : 'YOU LOSE! 😢';
             let color = (winnerId === socket.id) ? '#00ff00' : '#ff0000';
-            
             winText = self.add.text(250, 250, resultText, { fontSize: '60px', fill: color, backgroundColor: '#000' });
             subText = self.add.text(280, 320, 'Restarting in 5 seconds...', { fontSize: '20px', fill: '#fff' });
           });
 
           // --- GAME RESET ---
           socket.on('gameReset', () => {
-             console.log('Game Restarted!');
              if (winText) winText.destroy();
              if (subText) subText.destroy();
              self.physics.resume();
-             canCollect = true; // Reset par lock kholo
           });
 
           // --- PLAYERS ---
@@ -157,26 +190,17 @@ export class GameComponent implements OnInit {
                 player.playerId = players[id].playerId;
                 self.physics.add.collider(player, walls);
                 
-                // --- STRICT OVERLAP LOGIC ---
+                // Overlap Logic (Local Check)
                 if(star) {
                     self.physics.add.overlap(player, star, () => {
-                        // Agar Lock khula hai, tabhi uthao
-                        if (canCollect) {
-                            // 1. Turant Lock laga do (Tala band)
-                            canCollect = false; 
-                            
-                            // 2. Coin gayab karo
-                            star.setVisible(false);
-                            if(star.body) star.body.enable = false;
-
-                            // 3. Sirf ek baar server ko bolo
+                        if (star.visible) {
+                            star.setVisible(false); // Visual hide
                             socket.emit('starCollected');
                         }
                     }, undefined, self);
                 }
 
               } else {
-                // ENEMY
                 const other = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
                 other.setScale(1.5); 
                 other.setTint(0xff0000);
@@ -221,10 +245,21 @@ export class GameComponent implements OnInit {
         update: function(this: any) {
           if (player) {
             player.body.setVelocity(0);
-            if (cursors.left.isDown || wasd.A.isDown) player.body.setVelocityX(-200);
-            else if (cursors.right.isDown || wasd.D.isDown) player.body.setVelocityX(200);
-            if (cursors.up.isDown || wasd.W.isDown) player.body.setVelocityY(-200);
-            else if (cursors.down.isDown || wasd.S.isDown) player.body.setVelocityY(200);
+            
+            // --- UPDATED MOVEMENT LOGIC (Keyboard + Touch) ---
+            if (cursors.left.isDown || wasd.A.isDown || isTouchLeft) {
+                player.body.setVelocityX(-200);
+            }
+            else if (cursors.right.isDown || wasd.D.isDown || isTouchRight) {
+                player.body.setVelocityX(200);
+            }
+
+            if (cursors.up.isDown || wasd.W.isDown || isTouchUp) {
+                player.body.setVelocityY(-200);
+            }
+            else if (cursors.down.isDown || wasd.S.isDown || isTouchDown) {
+                player.body.setVelocityY(200);
+            }
 
             const x = player.x;
             const y = player.y;
