@@ -38,6 +38,10 @@ export class GameComponent implements OnInit {
     let star: any;
     let scoreText: any;
     
+    // --- STRICT LOCK VARIABLE (TALA) ---
+    // Ye batayega ki coin utha sakte hain ya nahi
+    let canCollect = true;
+
     let winText: any = null;
     let subText: any = null;
     let oldPosition: { x: number, y: number } | undefined;
@@ -82,20 +86,22 @@ export class GameComponent implements OnInit {
           star = self.add.circle(-100, -100, 15, 0xffff00);
           self.physics.add.existing(star);
 
-          // Star Location Update (Backend se nayi jagah aayi)
+          // Backend se naya coin aane par Lock kholo
           socket.on('starLocation', (location: any) => {
              if (!star || !star.scene) {
                  star = self.add.circle(location.x, location.y, 15, 0xffff00);
                  self.physics.add.existing(star);
              }
              
-             // --- FIX 1: Coin ko wapas dikhao aur Physics on karo ---
              star.setPosition(location.x, location.y);
-             star.setVisible(true); // Dikhao
+             star.setVisible(true);
              if(star.body) {
-                 star.body.enable = true; // Physics ON
+                 star.body.enable = true;
                  star.body.reset(location.x, location.y);
              }
+             
+             // --- LOCK KHOL DO (Ab naya coin utha sakte hain) ---
+             canCollect = true;
           });
 
           socket.emit('requestStar');
@@ -132,6 +138,7 @@ export class GameComponent implements OnInit {
              if (winText) winText.destroy();
              if (subText) subText.destroy();
              self.physics.resume();
+             canCollect = true; // Reset par lock kholo
           });
 
           // --- PLAYERS ---
@@ -150,16 +157,19 @@ export class GameComponent implements OnInit {
                 player.playerId = players[id].playerId;
                 self.physics.add.collider(player, walls);
                 
-                // --- FIX 2: Overlap Logic (Duplicate Points Fix) ---
+                // --- STRICT OVERLAP LOGIC ---
                 if(star) {
                     self.physics.add.overlap(player, star, () => {
-                        // Check karo: Kya coin abhi active hai?
-                        if (star.visible && star.body.enable) {
-                            // 1. Coin ko turant chhupa do (Local)
-                            star.setVisible(false);
-                            star.body.enable = false;
+                        // Agar Lock khula hai, tabhi uthao
+                        if (canCollect) {
+                            // 1. Turant Lock laga do (Tala band)
+                            canCollect = false; 
                             
-                            // 2. Sirf tabhi Server ko batao
+                            // 2. Coin gayab karo
+                            star.setVisible(false);
+                            if(star.body) star.body.enable = false;
+
+                            // 3. Sirf ek baar server ko bolo
                             socket.emit('starCollected');
                         }
                     }, undefined, self);
