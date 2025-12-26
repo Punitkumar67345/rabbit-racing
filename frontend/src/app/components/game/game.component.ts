@@ -22,11 +22,12 @@ export class GameComponent implements OnInit {
   }
 
   async initGame() {
-    const Phaser = await import('phaser');
+    // --- CHANGE 1: Import Fix (Constructor Error ke liye) ---
+    const PhaserImport = await import('phaser');
+    // Ye check karta hai ki Phaser default mein hai ya direct
+    const Phaser = (PhaserImport as any).default || PhaserImport;
     
     // --- LIVE CONNECTION LOGIC ---
-    // Agar Localhost (Computer) par hain, toh http://localhost:3000 use karo.
-    // Agar Online (Render.com) par hain, toh Automatic Link use karo.
     const url = window.location.hostname === 'localhost' ? 'http://localhost:3000' : undefined;
     this.socket = io(url);
 
@@ -55,7 +56,8 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            this.load.image('gubbu', 'assets/gubbu.png'); 
+            // --- CHANGE 2: Online Image Use kar rahe hain (Taaki file missing ka error na aaye) ---
+            this.load.image('gubbu', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
         },
 
         create: function(this: any) {
@@ -95,7 +97,7 @@ export class GameComponent implements OnInit {
              if(star.body) star.body.reset(location.x, location.y);
           });
 
-          // Zabardasti Star Maango (Backup)
+          // Zabardasti Star Maango
           socket.emit('requestStar');
 
           // --- SCOREBOARD ---
@@ -143,7 +145,8 @@ export class GameComponent implements OnInit {
               if (players[id].playerId === socket.id) {
                 // MAIN PLAYER
                 player = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
-                player.setScale(0.15); 
+                // --- CHANGE 3: Size Bada kiya (Online image ke liye) ---
+                player.setScale(1.5); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
                 self.physics.add.collider(player, walls);
@@ -154,7 +157,7 @@ export class GameComponent implements OnInit {
               } else {
                 // ENEMY
                 const other = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
-                other.setScale(0.15); 
+                other.setScale(1.5); 
                 other.setTint(0xff0000);
                 otherPlayers.add(other);
                 (other as any).playerId = players[id].playerId;
@@ -165,7 +168,7 @@ export class GameComponent implements OnInit {
 
           socket.on('newPlayer', (playerInfo: any) => {
             const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'gubbu');
-            other.setScale(0.15);
+            other.setScale(1.5);
             other.setTint(0xff0000);
             otherPlayers.add(other);
             (other as any).playerId = playerInfo.playerId;
