@@ -22,12 +22,10 @@ export class GameComponent implements OnInit {
   }
 
   async initGame() {
-    // --- CHANGE 1: Import Fix (Constructor Error ke liye) ---
     const PhaserImport = await import('phaser');
-    // Ye check karta hai ki Phaser default mein hai ya direct
     const Phaser = (PhaserImport as any).default || PhaserImport;
     
-    // --- LIVE CONNECTION LOGIC ---
+    // --- CONNECTION ---
     const url = window.location.hostname === 'localhost' ? 'http://localhost:3000' : undefined;
     this.socket = io(url);
 
@@ -40,7 +38,6 @@ export class GameComponent implements OnInit {
     let star: any;
     let scoreText: any;
     
-    // Win Text Variables
     let winText: any = null;
     let subText: any = null;
     let oldPosition: { x: number, y: number } | undefined;
@@ -56,7 +53,6 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- CHANGE 2: Online Image Use kar rahe hain (Taaki file missing ka error na aaye) ---
             this.load.image('gubbu', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
         },
 
@@ -86,18 +82,22 @@ export class GameComponent implements OnInit {
           star = self.add.circle(-100, -100, 15, 0xffff00);
           self.physics.add.existing(star);
 
+          // Star Location Update (Backend se nayi jagah aayi)
           socket.on('starLocation', (location: any) => {
-             // Agar Star destroy ho gaya tha, toh wapas banao
              if (!star || !star.scene) {
                  star = self.add.circle(location.x, location.y, 15, 0xffff00);
                  self.physics.add.existing(star);
              }
-             // Teleport Logic
+             
+             // --- FIX 1: Coin ko wapas dikhao aur Physics on karo ---
              star.setPosition(location.x, location.y);
-             if(star.body) star.body.reset(location.x, location.y);
+             star.setVisible(true); // Dikhao
+             if(star.body) {
+                 star.body.enable = true; // Physics ON
+                 star.body.reset(location.x, location.y);
+             }
           });
 
-          // Zabardasti Star Maango
           socket.emit('requestStar');
 
           // --- SCOREBOARD ---
@@ -145,15 +145,26 @@ export class GameComponent implements OnInit {
               if (players[id].playerId === socket.id) {
                 // MAIN PLAYER
                 player = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
-                // --- CHANGE 3: Size Bada kiya (Online image ke liye) ---
                 player.setScale(1.5); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
                 self.physics.add.collider(player, walls);
                 
+                // --- FIX 2: Overlap Logic (Duplicate Points Fix) ---
                 if(star) {
-                    self.physics.add.overlap(player, star, () => socket.emit('starCollected'), undefined, self);
+                    self.physics.add.overlap(player, star, () => {
+                        // Check karo: Kya coin abhi active hai?
+                        if (star.visible && star.body.enable) {
+                            // 1. Coin ko turant chhupa do (Local)
+                            star.setVisible(false);
+                            star.body.enable = false;
+                            
+                            // 2. Sirf tabhi Server ko batao
+                            socket.emit('starCollected');
+                        }
+                    }, undefined, self);
                 }
+
               } else {
                 // ENEMY
                 const other = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
