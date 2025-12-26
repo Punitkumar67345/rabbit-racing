@@ -118,10 +118,6 @@ io.on('connection', (socket) => {
     });
 });
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 server.listen(3000, () => {
     console.log('SERVER ON HAI! Port 3000 par.');
 });
