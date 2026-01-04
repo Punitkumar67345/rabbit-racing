@@ -25,7 +25,6 @@ export class GameComponent implements OnInit {
     const PhaserImport = await import('phaser');
     const Phaser = (PhaserImport as any).default || PhaserImport;
     
-    // --- CONNECTION ---
     const url = window.location.hostname === 'localhost' ? 'http://localhost:3000' : undefined;
     this.socket = io(url);
 
@@ -38,11 +37,12 @@ export class GameComponent implements OnInit {
     let star: any;
     let scoreText: any;
     
-    // Touch Control Variables
     let isTouchLeft = false;
     let isTouchRight = false;
     let isTouchUp = false;
     let isTouchDown = false;
+
+    let canCollect = true;
 
     let winText: any = null;
     let subText: any = null;
@@ -53,7 +53,6 @@ export class GameComponent implements OnInit {
       width: 800,
       height: 600,
       parent: 'game-container',
-      // --- MOBILE FIT: Phone screen par sahi dikhne ke liye ---
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -76,7 +75,7 @@ export class GameComponent implements OnInit {
               socket.emit('requestPlayers');
           });
 
-          // --- TOUCH BUTTONS (Phone Controls) ---
+          // --- TOUCH BUTTONS ---
           const createBtn = (x: number, y: number, text: string) => {
               let btn = self.add.text(x, y, text, { fontSize: '60px', backgroundColor: '#333', padding: { x: 10, y: 10 } })
                 .setScrollFactor(0)
@@ -84,15 +83,11 @@ export class GameComponent implements OnInit {
               return btn;
           };
 
-          // Buttons banayein (Neeche Left/Right/Up/Down)
-          // Left Side Controls
           const btnLeft = createBtn(50, 500, '⬅️');
           const btnRight = createBtn(200, 500, '➡️');
-          // Right Side Controls
           const btnUp = createBtn(600, 420, '⬆️');
           const btnDown = createBtn(600, 520, '⬇️');
 
-          // Touch Events Handlers
           btnLeft.on('pointerdown', () => isTouchLeft = true);
           btnLeft.on('pointerup', () => isTouchLeft = false);
           btnLeft.on('pointerout', () => isTouchLeft = false);
@@ -139,6 +134,7 @@ export class GameComponent implements OnInit {
                  star.body.enable = true;
                  star.body.reset(location.x, location.y);
              }
+             canCollect = true; 
           });
 
           socket.emit('requestStar');
@@ -157,10 +153,16 @@ export class GameComponent implements OnInit {
           };
           socket.on('scoreUpdate', updateScoreBoard);
 
-          // --- GAME OVER ---
+          // --- GAME OVER (FIXED HERE) ---
           socket.on('gameOver', (winnerId: string) => {
             self.physics.pause();
-            if(star) star.destroy(); 
+            
+            // --- FIX: Coin destroy MAT karo, bas chhupa do ---
+            if(star) {
+                star.setVisible(false);
+                if(star.body) star.body.enable = false;
+            }
+            
             let resultText = (winnerId === socket.id) ? 'YOU WIN! 🏆' : 'YOU LOSE! 😢';
             let color = (winnerId === socket.id) ? '#00ff00' : '#ff0000';
             winText = self.add.text(250, 250, resultText, { fontSize: '60px', fill: color, backgroundColor: '#000' });
@@ -172,6 +174,7 @@ export class GameComponent implements OnInit {
              if (winText) winText.destroy();
              if (subText) subText.destroy();
              self.physics.resume();
+             canCollect = true; 
           });
 
           // --- PLAYERS ---
@@ -190,11 +193,12 @@ export class GameComponent implements OnInit {
                 player.playerId = players[id].playerId;
                 self.physics.add.collider(player, walls);
                 
-                // Overlap Logic (Local Check)
+                // Overlap Logic
                 if(star) {
                     self.physics.add.overlap(player, star, () => {
-                        if (star.visible) {
+                        if (star.visible && canCollect) {
                             star.setVisible(false); // Visual hide
+                            canCollect = false; // Lock
                             socket.emit('starCollected');
                         }
                     }, undefined, self);
@@ -246,7 +250,6 @@ export class GameComponent implements OnInit {
           if (player) {
             player.body.setVelocity(0);
             
-            // --- UPDATED MOVEMENT LOGIC (Keyboard + Touch) ---
             if (cursors.left.isDown || wasd.A.isDown || isTouchLeft) {
                 player.body.setVelocityX(-200);
             }
