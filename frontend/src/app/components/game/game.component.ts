@@ -63,11 +63,8 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- "KEEDA" (Green Alien) WAPAS ---
-            // Hum direct internet wala link use kar rahe hain jo pehle tha
+            // --- ASSETS LOAD ---
             this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
-            
-            // Background aur Wall wahi rahenge jo aapne set kiye hain
             this.load.image('spaceBg', 'assets/bg.png');
             this.load.image('spaceWall', 'assets/wall.png');
         },
@@ -84,19 +81,21 @@ export class GameComponent implements OnInit {
               socket.emit('requestPlayers');
           });
 
-          // --- TOUCH BUTTONS ---
+          // --- UPDATED TOUCH BUTTONS (Transparent & Lower) ---
           const createBtn = (x: number, y: number, text: string) => {
-              let btn = self.add.text(x, y, text, { fontSize: '60px', backgroundColor: '#333', padding: { x: 10, y: 10 } })
+              // Background color hata diya hai, sirf text dikhega
+              let btn = self.add.text(x, y, text, { fontSize: '70px', padding: { x: 0, y: 0 } })
                 .setScrollFactor(0)
                 .setInteractive()
-                .setDepth(10);
+                .setDepth(20); // Depth badha di
               return btn;
           };
 
-          const btnLeft = createBtn(50, 500, '⬅️');
-          const btnRight = createBtn(200, 500, '➡️');
-          const btnUp = createBtn(600, 420, '⬆️');
-          const btnDown = createBtn(600, 520, '⬇️');
+          // Buttons ko screen ke kone mein neeche set kiya hai
+          const btnLeft = createBtn(20, 520, '⬅️');
+          const btnRight = createBtn(150, 520, '➡️');
+          const btnUp = createBtn(680, 440, '⬆️');
+          const btnDown = createBtn(680, 520, '⬇️');
 
           btnLeft.on('pointerdown', () => isTouchLeft = true);
           btnLeft.on('pointerup', () => isTouchLeft = false);
@@ -199,7 +198,6 @@ export class GameComponent implements OnInit {
               if (players[id].playerId === socket.id) {
                 // MAIN PLAYER
                 player = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                // --- SIZE WAPAS NORMAL KIYA (1.5) ---
                 player.setScale(1.5); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
