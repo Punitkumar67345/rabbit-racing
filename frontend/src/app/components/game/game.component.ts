@@ -63,11 +63,21 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            this.load.image('gubbu', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
+            // --- NEW ASSETS LOAD KAREIN ---
+            // Alien (Online hi rakhte hain abhi ke liye)
+            this.load.image('gubbu', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+            // Grass Background (Local assets folder se)
+            this.load.image('grassBg', 'assets/grass.png');
+            // Stone Wall (Local assets folder se)
+            this.load.image('stoneWall', 'assets/stone.png'); 
         },
 
         create: function(this: any) {
           const self = this;
+
+          // --- SABSE PEHLE BACKGROUND LAGAYEIN (Taaki ye sabke piche rahe) ---
+          // 800x600 ki screen ko cover karne ke liye tileSprite use kiya
+          this.add.tileSprite(400, 300, 800, 600, 'grassBg');
           
           socket.on('connect', () => {
               console.log('✅ Connected! My ID:', socket.id);
@@ -79,7 +89,8 @@ export class GameComponent implements OnInit {
           const createBtn = (x: number, y: number, text: string) => {
               let btn = self.add.text(x, y, text, { fontSize: '60px', backgroundColor: '#333', padding: { x: 10, y: 10 } })
                 .setScrollFactor(0)
-                .setInteractive();
+                .setInteractive()
+                .setDepth(10); // Depth badhaya taaki background ke upar dikhe
               return btn;
           };
 
@@ -105,10 +116,11 @@ export class GameComponent implements OnInit {
           btnDown.on('pointerout', () => isTouchDown = false);
 
 
-          // --- WALLS ---
+          // --- NEW WALLS (STONE TEXTURE) ---
           walls = self.physics.add.staticGroup();
           const createWall = (x: number, y: number, w: number, h: number) => {
-             const wall = self.add.rectangle(x, y, w, h, 0x0000ff);
+             // Rectangle ki jagah ab tileSprite (Image) use karenge
+             const wall = self.add.tileSprite(x, y, w, h, 'stoneWall');
              self.physics.add.existing(wall, true);
              walls.add(wall);
           };
@@ -139,8 +151,8 @@ export class GameComponent implements OnInit {
 
           socket.emit('requestStar');
 
-          // --- SCOREBOARD ---
-          scoreText = self.add.text(16, 16, 'Connecting...', { fontSize: '32px', fill: '#ffffff' });
+          // --- SCOREBOARD (Depth badhaya taaki upar dikhe) ---
+          scoreText = self.add.text(16, 16, 'Connecting...', { fontSize: '32px', fill: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setDepth(10);
           const updateScoreBoard = (players: any) => {
             let displayText = '';
             Object.keys(players).forEach((id) => {
@@ -153,11 +165,10 @@ export class GameComponent implements OnInit {
           };
           socket.on('scoreUpdate', updateScoreBoard);
 
-          // --- GAME OVER (FIXED HERE) ---
+          // --- GAME OVER ---
           socket.on('gameOver', (winnerId: string) => {
             self.physics.pause();
             
-            // --- FIX: Coin destroy MAT karo, bas chhupa do ---
             if(star) {
                 star.setVisible(false);
                 if(star.body) star.body.enable = false;
@@ -165,8 +176,8 @@ export class GameComponent implements OnInit {
             
             let resultText = (winnerId === socket.id) ? 'YOU WIN! 🏆' : 'YOU LOSE! 😢';
             let color = (winnerId === socket.id) ? '#00ff00' : '#ff0000';
-            winText = self.add.text(250, 250, resultText, { fontSize: '60px', fill: color, backgroundColor: '#000' });
-            subText = self.add.text(280, 320, 'Restarting in 5 seconds...', { fontSize: '20px', fill: '#fff' });
+            winText = self.add.text(250, 250, resultText, { fontSize: '60px', fill: color, backgroundColor: '#000' }).setDepth(20);
+            subText = self.add.text(280, 320, 'Restarting in 5 seconds...', { fontSize: '20px', fill: '#fff' }).setDepth(20);
           });
 
           // --- GAME RESET ---
