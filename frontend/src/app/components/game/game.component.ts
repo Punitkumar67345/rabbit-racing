@@ -9,8 +9,8 @@ import { io } from 'socket.io-client';
   styles: []
 })
 export class GameComponent implements OnInit {
+
   phaserGame: any;
-  config: any;
   socket: any;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
@@ -24,271 +24,178 @@ export class GameComponent implements OnInit {
   async initGame() {
     const PhaserImport = await import('phaser');
     const Phaser = (PhaserImport as any).default || PhaserImport;
-    
-    const url = window.location.hostname === 'localhost' ? 'http://localhost:3000' : undefined;
-    this.socket = io(url);
+
+    this.socket = io(
+      window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : undefined
+    );
 
     const socket = this.socket;
-    let player: any = null;
-    let otherPlayers: any;
+
+    let player: any;
+    let enemies: any;
     let walls: any;
+    let star: any;
     let cursors: any;
     let wasd: any;
-    let star: any;
     let scoreText: any;
-    
-    let isTouchLeft = false;
-    let isTouchRight = false;
-    let isTouchUp = false;
-    let isTouchDown = false;
+    let oldPos: any;
 
     let canCollect = true;
 
-    let winText: any = null;
-    let subText: any = null;
-    let oldPosition: { x: number, y: number } | undefined;
+    let touch = { l: false, r: false, u: false, d: false };
 
-    this.config = {
+    const config = {
       type: Phaser.AUTO,
       width: 800,
       height: 600,
       parent: 'game-container',
-      scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-      },
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
       physics: {
         default: 'arcade',
         arcade: { gravity: { x: 0, y: 0 }, debug: false }
       },
+
       scene: {
-        preload: function(this: any) {
-            // --- "KEEDA" (Green Alien) WAPAS ---
-            // Hum direct internet wala link use kar rahe hain jo pehle tha
-            this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
-            
-            // Background aur Wall wahi rahenge jo aapne set kiye hain
-            this.load.image('spaceBg', 'assets/bg.png');
-            this.load.image('spaceWall', 'assets/wall.png');
+        preload(this: any) {
+          this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+          this.load.image('spaceBg', 'assets/bg.png');
+          this.load.image('spaceWall', 'assets/wall.png');
         },
 
-        create: function(this: any) {
+        create(this: any) {
           const self = this;
 
-          // --- BACKGROUND ---
+          // Background
           this.add.tileSprite(400, 300, 800, 600, 'spaceBg');
-          
-          socket.on('connect', () => {
-              console.log('✅ Connected! My ID:', socket.id);
-              scoreText.setText('Connected! Loading...');
-              socket.emit('requestPlayers');
+
+          // Score
+          scoreText = this.add.text(16, 16, 'Connecting...', {
+            fontSize: '28px',
+            fill: '#fff',
+            stroke: '#000',
+            strokeThickness: 4
           });
 
-          // --- TOUCH BUTTONS ---
-          const createBtn = (x: number, y: number, text: string) => {
-              let btn = self.add.text(x, y, text, { fontSize: '60px', backgroundColor: '#333', padding: { x: 10, y: 10 } })
-                .setScrollFactor(0)
-                .setInteractive()
-                .setDepth(10);
-              return btn;
-          };
+          // Touch Buttons
+          const btn = (x: number, y: number, t: string, key: keyof typeof touch) =>
+            self.add.text(x, y, t, { fontSize: '50px', backgroundColor: '#333', padding: 10 })
+              .setInteractive()
+              .on('pointerdown', () => touch[key] = true)
+              .on('pointerup', () => touch[key] = false)
+              .on('pointerout', () => touch[key] = false);
 
-          const btnLeft = createBtn(50, 500, '⬅️');
-          const btnRight = createBtn(200, 500, '➡️');
-          const btnUp = createBtn(600, 420, '⬆️');
-          const btnDown = createBtn(600, 520, '⬇️');
+          btn(40, 500, '⬅️', 'l');
+          btn(160, 500, '➡️', 'r');
+          btn(640, 430, '⬆️', 'u');
+          btn(640, 520, '⬇️', 'd');
 
-          btnLeft.on('pointerdown', () => isTouchLeft = true);
-          btnLeft.on('pointerup', () => isTouchLeft = false);
-          btnLeft.on('pointerout', () => isTouchLeft = false);
-
-          btnRight.on('pointerdown', () => isTouchRight = true);
-          btnRight.on('pointerup', () => isTouchRight = false);
-          btnRight.on('pointerout', () => isTouchRight = false);
-
-          btnUp.on('pointerdown', () => isTouchUp = true);
-          btnUp.on('pointerup', () => isTouchUp = false);
-          btnUp.on('pointerout', () => isTouchUp = false);
-
-          btnDown.on('pointerdown', () => isTouchDown = true);
-          btnDown.on('pointerup', () => isTouchDown = false);
-          btnDown.on('pointerout', () => isTouchDown = false);
-
-
-          // --- WALLS ---
+          // Walls
           walls = self.physics.add.staticGroup();
-          const createWall = (x: number, y: number, w: number, h: number) => {
-             const wall = self.add.tileSprite(x, y, w, h, 'spaceWall');
-             self.physics.add.existing(wall, true);
-             walls.add(wall);
+          const wall = (x: number, y: number, w: number, h: number) => {
+            const o = self.add.tileSprite(x, y, w, h, 'spaceWall');
+            self.physics.add.existing(o, true);
+            walls.add(o);
           };
-          createWall(400, 50, 700, 20);
-          createWall(400, 550, 700, 20);
-          createWall(50, 300, 20, 500);
-          createWall(750, 300, 20, 500);
-          createWall(400, 300, 300, 20);
 
-          // --- STAR (COIN) ---
+          wall(400, 50, 700, 20);
+          wall(400, 550, 700, 20);
+          wall(50, 300, 20, 500);
+          wall(750, 300, 20, 500);
+          wall(400, 300, 300, 20);
+
+          // Star
           star = self.add.circle(-100, -100, 15, 0xffff00);
           self.physics.add.existing(star);
-          star.setDepth(5);
 
-          socket.on('starLocation', (location: any) => {
-             if (!star || !star.scene) {
-                 star = self.add.circle(location.x, location.y, 15, 0xffff00);
-                 self.physics.add.existing(star);
-                 star.setDepth(5);
-             }
-             
-             star.setPosition(location.x, location.y);
-             star.setVisible(true);
-             if(star.body) {
-                 star.body.enable = true;
-                 star.body.reset(location.x, location.y);
-             }
-             canCollect = true; 
+          // Players
+          enemies = self.physics.add.group();
+
+          // Input
+          cursors = self.input.keyboard.createCursorKeys();
+          wasd = self.input.keyboard.addKeys('W,A,S,D');
+
+          // SOCKET EVENTS
+          socket.on('connect', () => {
+            scoreText.setText('Connected');
+            socket.emit('requestPlayers');
+            socket.emit('requestStar');
           });
-
-          socket.emit('requestStar');
-
-          // --- SCOREBOARD ---
-          scoreText = self.add.text(16, 16, 'Connecting...', { fontSize: '32px', fill: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setDepth(10);
-          const updateScoreBoard = (players: any) => {
-            let displayText = '';
-            Object.keys(players).forEach((id) => {
-                const p = players[id];
-                const isMe = (p.playerId === socket.id);
-                const name = isMe ? 'ME (Green)' : 'Enemy (Red)';
-                displayText += name + ': ' + p.score + '\n';
-            });
-            scoreText.setText(displayText);
-          };
-          socket.on('scoreUpdate', updateScoreBoard);
-
-          // --- GAME OVER ---
-          socket.on('gameOver', (winnerId: string) => {
-            self.physics.pause();
-            
-            if(star) {
-                star.setVisible(false);
-                if(star.body) star.body.enable = false;
-            }
-            
-            let resultText = (winnerId === socket.id) ? 'YOU WIN! 🏆' : 'YOU LOSE! 😢';
-            let color = (winnerId === socket.id) ? '#00ff00' : '#ff0000';
-            winText = self.add.text(250, 250, resultText, { fontSize: '60px', fill: color, backgroundColor: '#000' }).setDepth(20);
-            subText = self.add.text(280, 320, 'Restarting in 5 seconds...', { fontSize: '20px', fill: '#fff' }).setDepth(20);
-          });
-
-          // --- GAME RESET ---
-          socket.on('gameReset', () => {
-             if (winText) winText.destroy();
-             if (subText) subText.destroy();
-             self.physics.resume();
-             canCollect = true; 
-          });
-
-          // --- PLAYERS ---
-          otherPlayers = self.physics.add.group();
 
           socket.on('currentPlayers', (players: any) => {
-            if(player) player.destroy();
-            otherPlayers.clear(true, true);
+            if (player) player.destroy();
+            enemies.clear(true, true);
 
-            Object.keys(players).forEach((id) => {
-              if (players[id].playerId === socket.id) {
-                // MAIN PLAYER
-                player = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                // --- SIZE WAPAS NORMAL KIYA (1.5) ---
-                player.setScale(1.5); 
-                player.setTint(0x00ff00);
-                player.playerId = players[id].playerId;
-                player.setDepth(5);
+            Object.values(players).forEach((p: any) => {
+              if (p.playerId === socket.id) {
+                player = self.physics.add.sprite(p.x, p.y, 'player')
+                  .setTint(0x00ff00)
+                  .setScale(1.5);
+
                 self.physics.add.collider(player, walls);
-                
-                if(star) {
-                    self.physics.add.overlap(player, star, () => {
-                        if (star.visible && canCollect) {
-                            star.setVisible(false); 
-                            canCollect = false; 
-                            socket.emit('starCollected');
-                        }
-                    }, undefined, self);
-                }
-
+                self.physics.add.overlap(player, star, () => {
+                  if (canCollect && star.visible) {
+                    canCollect = false;
+                    star.setVisible(false);
+                    socket.emit('starCollected');
+                  }
+                });
               } else {
-                // ENEMY
-                const other = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                other.setScale(1.5); 
-                other.setTint(0xff0000);
-                otherPlayers.add(other);
-                other.setDepth(5);
-                (other as any).playerId = players[id].playerId;
-              }
-            });
-            updateScoreBoard(players);
-          });
-
-          socket.on('newPlayer', (playerInfo: any) => {
-            const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
-            other.setScale(1.5);
-            other.setTint(0xff0000);
-            otherPlayers.add(other);
-            other.setDepth(5);
-            (other as any).playerId = playerInfo.playerId;
-          });
-
-          socket.on('playerMoved', (playerInfo: any) => {
-            otherPlayers.getChildren().forEach((other: any) => {
-              if (playerInfo.playerId === other.playerId) {
-                other.setPosition(playerInfo.x, playerInfo.y);
+                const e = self.physics.add.sprite(p.x, p.y, 'player')
+                  .setTint(0xff0000)
+                  .setScale(1.5);
+                (e as any).playerId = p.playerId;
+                enemies.add(e);
               }
             });
           });
 
-          socket.on('playerDisconnected', (playerId: any) => {
-            otherPlayers.getChildren().forEach((other: any) => {
-              if (playerId === other.playerId) other.destroy();
+          socket.on('playerMoved', (p: any) => {
+            enemies.getChildren().forEach((e: any) => {
+              if (e.playerId === p.playerId) e.setPosition(p.x, p.y);
             });
           });
 
-          cursors = self.input.keyboard.createCursorKeys();
-          wasd = self.input.keyboard.addKeys('W,S,A,D');
-          
-          if(socket.connected) {
-              socket.emit('requestPlayers');
-              socket.emit('requestStar');
-          }
+          socket.on('playerDisconnected', (id: string) => {
+            enemies.getChildren().forEach((e: any) => {
+              if (e.playerId === id) e.destroy();
+            });
+          });
+
+          socket.on('starLocation', (s: any) => {
+            star.setPosition(s.x, s.y);
+            star.setVisible(true);
+            canCollect = true;
+          });
+
+          socket.on('scoreUpdate', (players: any) => {
+            let t = '';
+            Object.values(players).forEach((p: any) => {
+              t += (p.playerId === socket.id ? 'ME' : 'ENEMY') + ': ' + p.score + '\n';
+            });
+            scoreText.setText(t);
+          });
         },
 
-        update: function(this: any) {
-          if (player) {
-            player.body.setVelocity(0);
-            
-            if (cursors.left.isDown || wasd.A.isDown || isTouchLeft) {
-                player.body.setVelocityX(-200);
-            }
-            else if (cursors.right.isDown || wasd.D.isDown || isTouchRight) {
-                player.body.setVelocityX(200);
-            }
+        update(this: any) {
+          if (!player) return;
 
-            if (cursors.up.isDown || wasd.W.isDown || isTouchUp) {
-                player.body.setVelocityY(-200);
-            }
-            else if (cursors.down.isDown || wasd.S.isDown || isTouchDown) {
-                player.body.setVelocityY(200);
-            }
+          player.body.setVelocity(0);
 
-            const x = player.x;
-            const y = player.y;
-            if (oldPosition && (x !== oldPosition.x || y !== oldPosition.y)) {
-              socket.emit('playerMovement', { x: player.x, y: player.y });
-            }
-            oldPosition = { x: player.x, y: player.y };
+          if (cursors.left.isDown || wasd.A.isDown || touch.l) player.body.setVelocityX(-200);
+          if (cursors.right.isDown || wasd.D.isDown || touch.r) player.body.setVelocityX(200);
+          if (cursors.up.isDown || wasd.W.isDown || touch.u) player.body.setVelocityY(-200);
+          if (cursors.down.isDown || wasd.S.isDown || touch.d) player.body.setVelocityY(200);
+
+          if (!oldPos || Phaser.Math.Distance.Between(player.x, player.y, oldPos.x, oldPos.y) > 5) {
+            socket.emit('playerMovement', { x: player.x, y: player.y });
+            oldPos = { x: player.x, y: player.y };
           }
         }
       }
     };
-    this.phaserGame = new Phaser.Game(this.config);
+
+    this.phaserGame = new Phaser.Game(config);
   }
 }
