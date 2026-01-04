@@ -63,12 +63,10 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- FIX 1: CHARACTER WAPAS GREEN ALIEN (Online) ---
-            this.load.image('gubbu', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
-            
-            // --- FIX 2: SPACE ASSETS (Local) ---
-            this.load.image('spaceBg', 'assets/space_bg.png'); 
-            this.load.image('spaceWall', 'assets/space_wall.png'); 
+            // --- LOCAL FILES (Simple Names) ---
+            this.load.image('gubbu', 'assets/gubbu.png');   // Player
+            this.load.image('spaceBg', 'assets/bg.png');    // Background
+            this.load.image('spaceWall', 'assets/wall.png'); // Wall/Platform
         },
 
         create: function(this: any) {
