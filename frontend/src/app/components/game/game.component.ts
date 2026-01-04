@@ -63,10 +63,12 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- LOCAL FILES (Simple Names) ---
-            this.load.image('gubbu', 'assets/gubbu.png');   // Player
-            this.load.image('spaceBg', 'assets/bg.png');    // Background
-            this.load.image('spaceWall', 'assets/wall.png'); // Wall/Platform
+            // Player wahi 'player' image use karega (jo assets/player.png hai)
+            // Dhyan rahe: Aapne file ka naam 'gubbu.png' rakha hai ya 'player.png'?
+            // Screenshot mein 'gubbu.png' dikh raha hai, isliye main wahi use kar raha hoon.
+            this.load.image('player', 'assets/gubbu.png'); 
+            this.load.image('spaceBg', 'assets/bg.png');
+            this.load.image('spaceWall', 'assets/wall.png');
         },
 
         create: function(this: any) {
@@ -195,27 +197,29 @@ export class GameComponent implements OnInit {
             Object.keys(players).forEach((id) => {
               if (players[id].playerId === socket.id) {
                 // MAIN PLAYER
-                player = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
-                player.setScale(1.5); 
+                player = self.physics.add.sprite(players[id].x, players[id].y, 'player');
+                // --- FIX: SIZE CHHOTA KIYA ---
+                player.setScale(0.15); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
                 player.setDepth(5);
                 self.physics.add.collider(player, walls);
                 
-                // Overlap Logic
                 if(star) {
                     self.physics.add.overlap(player, star, () => {
                         if (star.visible && canCollect) {
-                            star.setVisible(false); // Visual hide
-                            canCollect = false; // Lock
+                            star.setVisible(false); 
+                            canCollect = false; 
                             socket.emit('starCollected');
                         }
                     }, undefined, self);
                 }
 
               } else {
-                const other = self.physics.add.sprite(players[id].x, players[id].y, 'gubbu');
-                other.setScale(1.5); 
+                // ENEMY
+                const other = self.physics.add.sprite(players[id].x, players[id].y, 'player');
+                // --- FIX: SIZE CHHOTA KIYA ---
+                other.setScale(0.15); 
                 other.setTint(0xff0000);
                 otherPlayers.add(other);
                 other.setDepth(5);
@@ -226,8 +230,9 @@ export class GameComponent implements OnInit {
           });
 
           socket.on('newPlayer', (playerInfo: any) => {
-            const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'gubbu');
-            other.setScale(1.5);
+            const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
+            // --- FIX: SIZE CHHOTA KIYA ---
+            other.setScale(0.15);
             other.setTint(0xff0000);
             otherPlayers.add(other);
             other.setDepth(5);
