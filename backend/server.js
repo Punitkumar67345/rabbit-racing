@@ -74,7 +74,7 @@ io.on('connection', (socket) => {
             star.active = false;
 
             // 3. Score Badhao
-            players[socket.id].score += 10;
+            players[socket.id].score += 5;
             io.emit('scoreUpdate', players);
 
             if (players[socket.id].score >= 50) {
