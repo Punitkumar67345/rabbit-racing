@@ -63,21 +63,19 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- NEW ASSETS LOAD KAREIN ---
-            // Alien (Online hi rakhte hain abhi ke liye)
+            // --- FIX 1: CHARACTER WAPAS GREEN ALIEN (Online) ---
             this.load.image('gubbu', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
-            // Grass Background (Local assets folder se)
-            this.load.image('grassBg', 'assets/grass.png');
-            // Stone Wall (Local assets folder se)
-            this.load.image('stoneWall', 'assets/stone.png'); 
+            
+            // --- FIX 2: SPACE ASSETS (Local) ---
+            this.load.image('spaceBg', 'assets/space_bg.png'); 
+            this.load.image('spaceWall', 'assets/space_wall.png'); 
         },
 
         create: function(this: any) {
           const self = this;
 
-          // --- SABSE PEHLE BACKGROUND LAGAYEIN (Taaki ye sabke piche rahe) ---
-          // 800x600 ki screen ko cover karne ke liye tileSprite use kiya
-          this.add.tileSprite(400, 300, 800, 600, 'grassBg');
+          // --- BACKGROUND ---
+          this.add.tileSprite(400, 300, 800, 600, 'spaceBg');
           
           socket.on('connect', () => {
               console.log('✅ Connected! My ID:', socket.id);
@@ -90,7 +88,7 @@ export class GameComponent implements OnInit {
               let btn = self.add.text(x, y, text, { fontSize: '60px', backgroundColor: '#333', padding: { x: 10, y: 10 } })
                 .setScrollFactor(0)
                 .setInteractive()
-                .setDepth(10); // Depth badhaya taaki background ke upar dikhe
+                .setDepth(10);
               return btn;
           };
 
@@ -116,11 +114,10 @@ export class GameComponent implements OnInit {
           btnDown.on('pointerout', () => isTouchDown = false);
 
 
-          // --- NEW WALLS (STONE TEXTURE) ---
+          // --- WALLS ---
           walls = self.physics.add.staticGroup();
           const createWall = (x: number, y: number, w: number, h: number) => {
-             // Rectangle ki jagah ab tileSprite (Image) use karenge
-             const wall = self.add.tileSprite(x, y, w, h, 'stoneWall');
+             const wall = self.add.tileSprite(x, y, w, h, 'spaceWall');
              self.physics.add.existing(wall, true);
              walls.add(wall);
           };
@@ -133,11 +130,13 @@ export class GameComponent implements OnInit {
           // --- STAR (COIN) ---
           star = self.add.circle(-100, -100, 15, 0xffff00);
           self.physics.add.existing(star);
+          star.setDepth(5);
 
           socket.on('starLocation', (location: any) => {
              if (!star || !star.scene) {
                  star = self.add.circle(location.x, location.y, 15, 0xffff00);
                  self.physics.add.existing(star);
+                 star.setDepth(5);
              }
              
              star.setPosition(location.x, location.y);
@@ -151,7 +150,7 @@ export class GameComponent implements OnInit {
 
           socket.emit('requestStar');
 
-          // --- SCOREBOARD (Depth badhaya taaki upar dikhe) ---
+          // --- SCOREBOARD ---
           scoreText = self.add.text(16, 16, 'Connecting...', { fontSize: '32px', fill: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setDepth(10);
           const updateScoreBoard = (players: any) => {
             let displayText = '';
@@ -202,6 +201,7 @@ export class GameComponent implements OnInit {
                 player.setScale(1.5); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
+                player.setDepth(5);
                 self.physics.add.collider(player, walls);
                 
                 // Overlap Logic
@@ -220,6 +220,7 @@ export class GameComponent implements OnInit {
                 other.setScale(1.5); 
                 other.setTint(0xff0000);
                 otherPlayers.add(other);
+                other.setDepth(5);
                 (other as any).playerId = players[id].playerId;
               }
             });
@@ -231,6 +232,7 @@ export class GameComponent implements OnInit {
             other.setScale(1.5);
             other.setTint(0xff0000);
             otherPlayers.add(other);
+            other.setDepth(5);
             (other as any).playerId = playerInfo.playerId;
           });
 
