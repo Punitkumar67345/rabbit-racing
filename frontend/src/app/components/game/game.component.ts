@@ -25,6 +25,7 @@ export class GameComponent implements OnInit {
     const PhaserImport = await import('phaser');
     const Phaser = (PhaserImport as any).default || PhaserImport;
     
+    // SERVER CONNECTION
     const url = window.location.hostname === 'localhost' ? 'http://localhost:3000' : undefined;
     this.socket = io(url);
 
@@ -63,8 +64,10 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- ASSETS LOAD ---
-            this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
+            // --- CHANGE 1: GUBBU WAPAS AAYA ---
+            // Hum 'assets/gubbu.png' use kar rahe hain
+            this.load.image('player', 'assets/gubbu.png'); 
+            
             this.load.image('spaceBg', 'assets/bg.png');
             this.load.image('spaceWall', 'assets/wall.png');
         },
@@ -76,22 +79,20 @@ export class GameComponent implements OnInit {
           this.add.tileSprite(400, 300, 800, 600, 'spaceBg');
           
           socket.on('connect', () => {
-              console.log('✅ Connected! My ID:', socket.id);
               scoreText.setText('Connected! Loading...');
               socket.emit('requestPlayers');
+              socket.emit('requestStar');
           });
 
-          // --- UPDATED TOUCH BUTTONS (Transparent & Lower) ---
+          // --- TOUCH BUTTONS ---
           const createBtn = (x: number, y: number, text: string) => {
-              // Background color hata diya hai, sirf text dikhega
               let btn = self.add.text(x, y, text, { fontSize: '70px', padding: { x: 0, y: 0 } })
                 .setScrollFactor(0)
                 .setInteractive()
-                .setDepth(20); // Depth badha di
+                .setDepth(20);
               return btn;
           };
 
-          // Buttons ko screen ke kone mein neeche set kiya hai
           const btnLeft = createBtn(20, 520, '⬅️');
           const btnRight = createBtn(150, 520, '➡️');
           const btnUp = createBtn(680, 440, '⬆️');
@@ -138,7 +139,6 @@ export class GameComponent implements OnInit {
                  self.physics.add.existing(star);
                  star.setDepth(5);
              }
-             
              star.setPosition(location.x, location.y);
              star.setVisible(true);
              if(star.body) {
@@ -147,8 +147,6 @@ export class GameComponent implements OnInit {
              }
              canCollect = true; 
           });
-
-          socket.emit('requestStar');
 
           // --- SCOREBOARD ---
           scoreText = self.add.text(16, 16, 'Connecting...', { fontSize: '32px', fill: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setDepth(10);
@@ -167,19 +165,16 @@ export class GameComponent implements OnInit {
           // --- GAME OVER ---
           socket.on('gameOver', (winnerId: string) => {
             self.physics.pause();
-            
             if(star) {
                 star.setVisible(false);
                 if(star.body) star.body.enable = false;
             }
-            
             let resultText = (winnerId === socket.id) ? 'YOU WIN! 🏆' : 'YOU LOSE! 😢';
             let color = (winnerId === socket.id) ? '#00ff00' : '#ff0000';
             winText = self.add.text(250, 250, resultText, { fontSize: '60px', fill: color, backgroundColor: '#000' }).setDepth(20);
             subText = self.add.text(280, 320, 'Restarting in 5 seconds...', { fontSize: '20px', fill: '#fff' }).setDepth(20);
           });
 
-          // --- GAME RESET ---
           socket.on('gameReset', () => {
              if (winText) winText.destroy();
              if (subText) subText.destroy();
@@ -198,7 +193,8 @@ export class GameComponent implements OnInit {
               if (players[id].playerId === socket.id) {
                 // MAIN PLAYER
                 player = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                player.setScale(1.5); 
+                // --- CHANGE 2: SIZE CHHOTA KIYA (0.15) ---
+                player.setScale(0.15); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
                 player.setDepth(5);
@@ -213,11 +209,11 @@ export class GameComponent implements OnInit {
                         }
                     }, undefined, self);
                 }
-
               } else {
                 // ENEMY
                 const other = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                other.setScale(1.5); 
+                // --- CHANGE 2: SIZE CHHOTA KIYA (0.15) ---
+                other.setScale(0.15); 
                 other.setTint(0xff0000);
                 otherPlayers.add(other);
                 other.setDepth(5);
@@ -229,17 +225,26 @@ export class GameComponent implements OnInit {
 
           socket.on('newPlayer', (playerInfo: any) => {
             const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
-            other.setScale(1.5);
+            // --- CHANGE 2: SIZE CHHOTA KIYA (0.15) ---
+            other.setScale(0.15);
             other.setTint(0xff0000);
             otherPlayers.add(other);
             other.setDepth(5);
             (other as any).playerId = playerInfo.playerId;
           });
 
+          // --- CHANGE 3: SMOOTH MOVEMENT (NO LAG) ---
           socket.on('playerMoved', (playerInfo: any) => {
             otherPlayers.getChildren().forEach((other: any) => {
               if (playerInfo.playerId === other.playerId) {
-                other.setPosition(playerInfo.x, playerInfo.y);
+                // Teleport ki jagah Tween (Slide) use kar rahe hain
+                self.tweens.add({
+                    targets: other,
+                    x: playerInfo.x,
+                    y: playerInfo.y,
+                    duration: 100, // 100ms mein pahunchega (Masks lag)
+                    ease: 'Linear'
+                });
               }
             });
           });
@@ -254,6 +259,7 @@ export class GameComponent implements OnInit {
           wasd = self.input.keyboard.addKeys('W,S,A,D');
           
           if(socket.connected) {
+              scoreText.setText('Connected! Loading...');
               socket.emit('requestPlayers');
               socket.emit('requestStar');
           }
@@ -279,10 +285,12 @@ export class GameComponent implements OnInit {
 
             const x = player.x;
             const y = player.y;
-            if (oldPosition && (x !== oldPosition.x || y !== oldPosition.y)) {
+            // Network Traffic Kam karne ke liye check
+            if (oldPosition && (Math.abs(x - oldPosition.x) > 2 || Math.abs(y - oldPosition.y) > 2)) {
               socket.emit('playerMovement', { x: player.x, y: player.y });
+              oldPosition = { x: player.x, y: player.y };
             }
-            oldPosition = { x: player.x, y: player.y };
+            if (!oldPosition) oldPosition = { x: player.x, y: player.y };
           }
         }
       }
