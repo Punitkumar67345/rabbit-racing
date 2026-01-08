@@ -20,16 +20,31 @@ const io = new Server(server, {
 });
 
 var players = {};
+const MAX_PLAYERS = 5; // <--- YAHAN LIMIT SET KI HAI
 
-// --- STAR OBJECT (Active Flag ke saath) ---
+// --- STAR OBJECT ---
 var star = {
-  x: Math.floor(Math.random() * 700) + 50,
-  y: Math.floor(Math.random() * 500) + 50,
-  active: true // TRUE matlab coin abhi wahan hai
+    x: Math.floor(Math.random() * 700) + 50,
+    y: Math.floor(Math.random() * 500) + 50,
+    active: true 
 };
 
 io.on('connection', (socket) => {
-    console.log('Naya Player aaya:', socket.id);
+    
+    // --- STEP 1: HOUSEFULL CHECK ---
+    const currentCount = Object.keys(players).length;
+    
+    if (currentCount >= MAX_PLAYERS) {
+        console.log(`⚠️ Connection Rejected: Server Full (${currentCount}/${MAX_PLAYERS})`);
+        // Player ko batao ki server full hai
+        socket.emit('serverMsg', 'Server Full! Max 5 players allowed.');
+        // Turant disconnect kar do
+        socket.disconnect();
+        return; // Aage ka code mat चलाओ
+    }
+
+    // --- STEP 2: AGAR JAGAH HAI TOH AANE DO ---
+    console.log('✅ Naya Player aaya:', socket.id, `(Total: ${currentCount + 1})`);
 
     players[socket.id] = {
         x: 400,
@@ -60,26 +75,17 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- STRICT COIN COLLECTION LOGIC ---
+    // --- COIN LOGIC ---
     socket.on('starCollected', function () {
-        // 1. Check karo: Kya coin abhi active hai?
-        // Agar active FALSE hai, iska matlab kisi ne (ya isi player ne) abhi uthaya hai.
-        // TOH RUK JAO (Return). Point mat do.
-        if (!star.active) {
-            return; 
-        }
+        if (!star.active) return; 
 
         if (players[socket.id]) {
-            // 2. Turant Coin ko Inactive kar do (Taaki dubara count na ho)
             star.active = false;
-
-            // 3. Score Badhao
             players[socket.id].score += 5;
             io.emit('scoreUpdate', players);
 
             if (players[socket.id].score >= 50) {
                 io.emit('gameOver', socket.id);
-
                 setTimeout(() => {
                     console.log('🔄 Game Resetting...');
                     Object.keys(players).forEach(id => {
@@ -87,24 +93,18 @@ io.on('connection', (socket) => {
                         players[id].x = 400;
                         players[id].y = 300;
                     });
-                    
-                    // Reset ke waqt naya coin aur Active TRUE
                     star.x = Math.floor(Math.random() * 700) + 50;
                     star.y = Math.floor(Math.random() * 500) + 50;
                     star.active = true;
-
                     io.emit('gameReset');
                     io.emit('currentPlayers', players);
                     io.emit('scoreUpdate', players);
                     io.emit('starLocation', star);
                 }, 5000);
-
             } else {
-                // Game chal raha hai -> Naya coin banao
                 star.x = Math.floor(Math.random() * 700) + 50;
                 star.y = Math.floor(Math.random() * 500) + 50;
-                star.active = true; // Wapas Active kar do
-                
+                star.active = true;
                 io.emit('starLocation', star);
             }
         }
@@ -112,12 +112,15 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('Player chala gaya:', socket.id);
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
-        io.emit('scoreUpdate', players);
+        if (players[socket.id]) {
+            delete players[socket.id];
+            io.emit('playerDisconnected', socket.id);
+            io.emit('scoreUpdate', players);
+        }
     });
 });
 
-server.listen(3000, () => {
-    console.log('SERVER ON HAI! Port 3000 par.');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`SERVER ON HAI! Port ${PORT} par.`);
 });
