@@ -154,14 +154,14 @@ export class GameComponent implements OnInit {
           star.setDepth(5);
           
           // --- FIX: Scale Bada Kiya (0.5) Taaki Dikhe ---
-          star.setScale(0.5); 
+          star.setScale(0.1); 
 
           socket.on('starLocation', (location: any) => {
              if (!star || !star.scene) {
                  // Agar coin destroy ho gaya ho, naya banao
                  star = self.physics.add.sprite(location.x, location.y, 'coin');
                  star.setDepth(5);
-                 star.setScale(0.5); // Size bada rakha hai
+                 star.setScale(0.1); // Size bada rakha hai
              }
              
              star.setPosition(location.x, location.y);
