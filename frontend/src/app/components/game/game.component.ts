@@ -35,7 +35,7 @@ export class GameComponent implements OnInit {
     let walls: any;
     let cursors: any;
     let wasd: any;
-    let star: any;
+    let star: any; // Hum variable ka naam 'star' hi rakhenge, par dikhega 'Coin'
     let scoreText: any;
     
     let isTouchLeft = false;
@@ -64,12 +64,12 @@ export class GameComponent implements OnInit {
       },
       scene: {
         preload: function(this: any) {
-            // --- CHANGE 1: GUBBU WAPAS AAYA ---
-            // Hum 'assets/gubbu.png' use kar rahe hain
             this.load.image('player', 'assets/gubbu.png'); 
-            
             this.load.image('spaceBg', 'assets/bg.png');
             this.load.image('spaceWall', 'assets/wall.png');
+            
+            // --- NEW: COIN IMAGE LOAD KIYA ---
+            this.load.image('coin', 'assets/coin.png');
         },
 
         create: function(this: any) {
@@ -128,16 +128,17 @@ export class GameComponent implements OnInit {
           createWall(750, 300, 20, 500);
           createWall(400, 300, 300, 20);
 
-          // --- STAR (COIN) ---
-          star = self.add.circle(-100, -100, 15, 0xffff00);
-          self.physics.add.existing(star);
+          // --- COIN (Sprite) ---
+          // Pehle hum 'circle' bana rahe the, ab hum 'sprite' (image) use karenge
+          star = self.physics.add.sprite(-100, -100, 'coin');
           star.setDepth(5);
+          star.setScale(0.1); // Size adjust karein (0.1 try karein, agar bada/chhota lage to change karein)
 
           socket.on('starLocation', (location: any) => {
              if (!star || !star.scene) {
-                 star = self.add.circle(location.x, location.y, 15, 0xffff00);
-                 self.physics.add.existing(star);
+                 star = self.physics.add.sprite(location.x, location.y, 'coin');
                  star.setDepth(5);
+                 star.setScale(0.1); // Size yahan bhi same rakhein
              }
              star.setPosition(location.x, location.y);
              star.setVisible(true);
@@ -193,7 +194,6 @@ export class GameComponent implements OnInit {
               if (players[id].playerId === socket.id) {
                 // MAIN PLAYER
                 player = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                // --- CHANGE 2: SIZE CHHOTA KIYA (0.15) ---
                 player.setScale(0.15); 
                 player.setTint(0x00ff00);
                 player.playerId = players[id].playerId;
@@ -212,7 +212,6 @@ export class GameComponent implements OnInit {
               } else {
                 // ENEMY
                 const other = self.physics.add.sprite(players[id].x, players[id].y, 'player');
-                // --- CHANGE 2: SIZE CHHOTA KIYA (0.15) ---
                 other.setScale(0.15); 
                 other.setTint(0xff0000);
                 otherPlayers.add(other);
@@ -225,7 +224,6 @@ export class GameComponent implements OnInit {
 
           socket.on('newPlayer', (playerInfo: any) => {
             const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
-            // --- CHANGE 2: SIZE CHHOTA KIYA (0.15) ---
             other.setScale(0.15);
             other.setTint(0xff0000);
             otherPlayers.add(other);
@@ -233,16 +231,14 @@ export class GameComponent implements OnInit {
             (other as any).playerId = playerInfo.playerId;
           });
 
-          // --- CHANGE 3: SMOOTH MOVEMENT (NO LAG) ---
           socket.on('playerMoved', (playerInfo: any) => {
             otherPlayers.getChildren().forEach((other: any) => {
               if (playerInfo.playerId === other.playerId) {
-                // Teleport ki jagah Tween (Slide) use kar rahe hain
                 self.tweens.add({
                     targets: other,
                     x: playerInfo.x,
                     y: playerInfo.y,
-                    duration: 100, // 100ms mein pahunchega (Masks lag)
+                    duration: 100,
                     ease: 'Linear'
                 });
               }
@@ -285,7 +281,6 @@ export class GameComponent implements OnInit {
 
             const x = player.x;
             const y = player.y;
-            // Network Traffic Kam karne ke liye check
             if (oldPosition && (Math.abs(x - oldPosition.x) > 2 || Math.abs(y - oldPosition.y) > 2)) {
               socket.emit('playerMovement', { x: player.x, y: player.y });
               oldPosition = { x: player.x, y: player.y };
