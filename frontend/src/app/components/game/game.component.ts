@@ -340,7 +340,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
     /* ── ULTIMATE PERFORMANCE: Force WebSocket (0 Polling Delay) ── */
     this.socket = io(serverUrl, {
-      transports: ['websocket'] // Seedha fast connection!
+      transports: ['websocket'] 
     });
     
     const socket   = this.socket;
@@ -348,7 +348,7 @@ export class GameComponent implements OnInit, OnDestroy {
     const playerName = this.playerName;
 
     let player       : any = null;
-    let otherPlayers : any;
+    let otherPlayersMap: Record<string, any> = {}; // OPTIMIZED: Replaced slow group array with fast Map
     let walls        : any;
     let cursors      : any;
     let wasd         : any;
@@ -387,7 +387,7 @@ export class GameComponent implements OnInit, OnDestroy {
       clearBeforeRender: false,
       powerPreference: 'high-performance',
       fps: {
-        target: 120,               // 120 FPS smooth render
+        target: 120,               
         forceSetTimeOut: true,
         smoothStep: true           
       },
@@ -522,13 +522,12 @@ export class GameComponent implements OnInit, OnDestroy {
             fill      : '#94a3b8'
           }).setScrollFactor(0).setDepth(10);
 
-          /* ── Init Groups & Inputs ── */
-          otherPlayers = scene.physics.add.group();
+          /* ── Init Inputs ── */
           cursors = scene.input.keyboard.createCursorKeys();
           wasd    = scene.input.keyboard.addKeys('W,S,A,D');
 
           /* ════════════════
-             SOCKET EVENTS
+              SOCKET EVENTS
           ════════════════ */
 
           const updateScoreBoard = (players: Record<string, PlayerState>) => {
@@ -563,7 +562,10 @@ export class GameComponent implements OnInit, OnDestroy {
 
           socket.on('currentPlayersInRoom', ({ players }: { players: Record<string, PlayerState> }) => {
             if (player) { player.destroy(); player = null; }
-            otherPlayers.clear(true, true);
+            
+            // OPTIMIZED: Clear the map
+            Object.values(otherPlayersMap).forEach(p => p.destroy());
+            otherPlayersMap = {};
 
             Object.values(players).forEach(pData => {
               if (pData.playerId === socket.id) {
@@ -576,7 +578,7 @@ export class GameComponent implements OnInit, OnDestroy {
                 const other = scene.physics.add.sprite(pData.x, pData.y, 'player');
                 other.setScale(0.15).setTint(0xff0000).setDepth(5);
                 (other as any).playerId = pData.playerId;
-                otherPlayers.add(other);
+                otherPlayersMap[pData.playerId] = other; // Fast Insert
               }
             });
             updateScoreBoard(players);
@@ -586,7 +588,7 @@ export class GameComponent implements OnInit, OnDestroy {
             const other = scene.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
             other.setScale(0.15).setTint(0xff0000).setDepth(5);
             (other as any).playerId = playerInfo.playerId;
-            otherPlayers.add(other);
+            otherPlayersMap[playerInfo.playerId] = other; // Fast Insert
           });
 
           socket.on('starLocationInRoom', ({ star: starData }: { star: StarState }) => {
@@ -598,8 +600,8 @@ export class GameComponent implements OnInit, OnDestroy {
           });
 
           socket.on('playerMovedInRoom', ({ playerInfo }: { playerInfo: PlayerState }) => {
-            otherPlayers.getChildren().forEach((other: any) => {
-              if (other.playerId !== playerInfo.playerId) return;
+            const other = otherPlayersMap[playerInfo.playerId]; // OPTIMIZED: O(1) Instant Lookup
+            if (other) {
               scene.tweens.killTweensOf(other);
               scene.tweens.add({
                 targets  : other,
@@ -608,13 +610,15 @@ export class GameComponent implements OnInit, OnDestroy {
                 duration : 25,          // <-- Perfect Sync: Exact 25ms (Matches backend 40-Tick)
                 ease     : 'Linear'
               });
-            });
+            }
           });
 
           socket.on('playerDisconnectedInRoom', ({ playerId }: { playerId: string }) => {
-            otherPlayers.getChildren().forEach((other: any) => {
-              if (other.playerId === playerId) other.destroy();
-            });
+            const other = otherPlayersMap[playerId]; // OPTIMIZED: O(1) Lookup
+            if (other) {
+              other.destroy();
+              delete otherPlayersMap[playerId];
+            }
           });
 
           socket.on('gameOverInRoom', ({ winnerId }: { winnerId: string }) => {
