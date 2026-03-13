@@ -6,121 +6,180 @@ const path = require('path');
 
 const app = express();
 app.use(cors());
-
-// Frontend Files Serve
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-var players = {};
-const MAX_PLAYERS = 5; // <--- YAHAN LIMIT SET KI HAI
+/* =========================
+   CONFIG & STATE
+========================= */
+const MAX_PLAYERS = 5, WIN_SCORE = 50, GAME_WIDTH = 800, GAME_HEIGHT = 600, SPAWN_X = 400, SPAWN_Y = 300;
+const rooms = {}; // roomName → RoomObject
 
-// --- STAR OBJECT ---
-var star = {
-    x: Math.floor(Math.random() * 700) + 50,
-    y: Math.floor(Math.random() * 500) + 50,
-    active: true 
+/* =========================
+   HELPERS
+========================= */
+const generateStar = () => ({
+  x: Math.floor(Math.random() * (GAME_WIDTH - 100)) + 50,
+  y: Math.floor(Math.random() * (GAME_HEIGHT - 100)) + 50,
+  active: true
+});
+
+const createRoom = (roomName) => {
+  rooms[roomName] = { players: {}, star: generateStar(), gameOver: false, created: Date.now() };
+  console.log('[Room Created]', roomName);
 };
 
+const resetRoom = (room) => {
+  room.gameOver = false;
+  room.star = generateStar();
+  for (const id in room.players) {
+    const p = room.players[id];
+    p.score = 0;
+    p.x = SPAWN_X;
+    p.y = SPAWN_Y;
+    p.isDirty = true; 
+  }
+};
+
+const emitToRoom = (roomName, event, data = {}) => {
+  io.to(roomName).emit(event, { roomName, ...data });
+};
+
+/* =========================
+   SOCKET CONNECTION
+========================= */
 io.on('connection', (socket) => {
+  console.log('[Connected]', socket.id);
+
+  /* ── JOIN ROOM ── */
+  socket.on('joinRoom', ({ roomName, playerName }) => {
+    if (!rooms[roomName]) createRoom(roomName);
     
-    // --- STEP 1: HOUSEFULL CHECK ---
-    const currentCount = Object.keys(players).length;
-    
-    if (currentCount >= MAX_PLAYERS) {
-        console.log(`⚠️ Connection Rejected: Server Full (${currentCount}/${MAX_PLAYERS})`);
-        // Player ko batao ki server full hai
-        socket.emit('serverMsg', 'Server Full! Max 5 players allowed.');
-        // Turant disconnect kar do
-        socket.disconnect();
-        return; // Aage ka code mat चलाओ
+    const room = rooms[roomName];
+    if (Object.keys(room.players).length >= MAX_PLAYERS) {
+      return socket.emit('serverError', { msg: 'Room is full (max 5 players).' });
     }
 
-    // --- STEP 2: AGAR JAGAH HAI TOH AANE DO ---
-    console.log('✅ Naya Player aaya:', socket.id, `(Total: ${currentCount + 1})`);
-
-    players[socket.id] = {
-        x: 400,
-        y: 300,
-        playerId: socket.id,
-        score: 0
+    socket.join(roomName);
+    const playerInfo = {
+      playerId: socket.id,
+      playerName: (playerName || 'Player').slice(0, 20),
+      x: SPAWN_X, y: SPAWN_Y, score: 0, isDirty: false
     };
-
-    socket.emit('currentPlayers', players);
-    socket.emit('starLocation', star);
     
-    socket.on('requestStar', () => {
-        socket.emit('starLocation', star);
-    });
+    room.players[socket.id] = playerInfo;
+    console.log(`[Join] ${playerInfo.playerName} → ${roomName}`);
 
-    socket.on('requestPlayers', () => {
-        socket.emit('currentPlayers', players);
-    });
+    // Send initial state
+    socket.emit('currentPlayersInRoom', { roomName, players: room.players });
+    socket.emit('starLocationInRoom', { roomName, star: room.star });
 
-    socket.broadcast.emit('newPlayer', players[socket.id]);
-    io.emit('scoreUpdate', players);
+    // Notify others
+    socket.to(roomName).emit('newPlayerInRoom', { roomName, playerInfo });
+    emitToRoom(roomName, 'scoreUpdateInRoom', { players: room.players });
+  });
 
-    socket.on('playerMovement', (movementData) => {
-        if (players[socket.id]) {
-            players[socket.id].x = movementData.x;
-            players[socket.id].y = movementData.y;
-            socket.broadcast.emit('playerMoved', players[socket.id]);
-        }
-    });
+  /* ── PLAYER MOVEMENT ── */
+  socket.on('playerMovementInRoom', ({ roomName, movementData }) => {
+    const player = rooms[roomName]?.players[socket.id];
+    if (player) {
+      player.x = movementData.x;
+      player.y = movementData.y;
+      player.isDirty = true; 
+    }
+  });
 
-    // --- COIN LOGIC ---
-    socket.on('starCollected', function () {
-        if (!star.active) return; 
+  /* ── STAR COLLECTED ── */
+  socket.on('starCollectedInRoom', ({ roomName }) => {
+    const room = rooms[roomName];
+    if (!room || room.gameOver || !room.star.active) return;
 
-        if (players[socket.id]) {
-            star.active = false;
-            players[socket.id].score += 5;
-            io.emit('scoreUpdate', players);
+    const player = room.players[socket.id];
+    if (!player) return;
 
-            if (players[socket.id].score >= 50) {
-                io.emit('gameOver', socket.id);
-                setTimeout(() => {
-                    console.log('🔄 Game Resetting...');
-                    Object.keys(players).forEach(id => {
-                        players[id].score = 0;
-                        players[id].x = 400;
-                        players[id].y = 300;
-                    });
-                    star.x = Math.floor(Math.random() * 700) + 50;
-                    star.y = Math.floor(Math.random() * 500) + 50;
-                    star.active = true;
-                    io.emit('gameReset');
-                    io.emit('currentPlayers', players);
-                    io.emit('scoreUpdate', players);
-                    io.emit('starLocation', star);
-                }, 5000);
-            } else {
-                star.x = Math.floor(Math.random() * 700) + 50;
-                star.y = Math.floor(Math.random() * 500) + 50;
-                star.active = true;
-                io.emit('starLocation', star);
-            }
-        }
-    });
+    room.star.active = false;
+    player.score += 5;
 
-    socket.on('disconnect', () => {
-        console.log('Player chala gaya:', socket.id);
-        if (players[socket.id]) {
-            delete players[socket.id];
-            io.emit('playerDisconnected', socket.id);
-            io.emit('scoreUpdate', players);
-        }
-    });
+    emitToRoom(roomName, 'scoreUpdateInRoom', { players: room.players });
+
+    /* ── WIN CONDITION ── */
+    if (player.score >= WIN_SCORE) {
+      room.gameOver = true;
+      emitToRoom(roomName, 'gameOverInRoom', { winnerId: socket.id });
+
+      setTimeout(() => {
+        const activeRoom = rooms[roomName];
+        if (!activeRoom) return; // Room deleted check
+
+        resetRoom(activeRoom);
+        
+        emitToRoom(roomName, 'gameResetInRoom');
+        emitToRoom(roomName, 'currentPlayersInRoom', { players: activeRoom.players });
+        emitToRoom(roomName, 'scoreUpdateInRoom', { players: activeRoom.players });
+        emitToRoom(roomName, 'starLocationInRoom', { star: activeRoom.star });
+      }, 5000);
+    } else {
+      /* ── NEXT STAR ── */
+      room.star = generateStar();
+      emitToRoom(roomName, 'starLocationInRoom', { star: room.star });
+    }
+  });
+
+  /* ── REQUEST HELPERS ── */
+  socket.on('requestPlayersInRoom', ({ roomName }) => {
+    if (rooms[roomName]) socket.emit('currentPlayersInRoom', { roomName, players: rooms[roomName].players });
+  });
+
+  socket.on('requestStarInRoom', ({ roomName }) => {
+    if (rooms[roomName]) socket.emit('starLocationInRoom', { roomName, star: rooms[roomName].star });
+  });
+
+  /* ── DISCONNECT ── */
+  socket.on('disconnecting', () => {
+    // Optimized: No array creation, direct loop over socket.rooms set
+    for (const roomName of socket.rooms) {
+      const room = rooms[roomName];
+      if (!room) continue;
+
+      delete room.players[socket.id];
+      io.to(roomName).emit('playerDisconnectedInRoom', { roomName, playerId: socket.id });
+      emitToRoom(roomName, 'scoreUpdateInRoom', { players: room.players });
+
+      // Delete empty rooms
+      if (Object.keys(room.players).length === 0) {
+        delete rooms[roomName];
+        console.log('[Room Deleted]', roomName);
+      }
+    }
+  });
+
+  socket.on('disconnect', () => console.log('[Disconnected]', socket.id));
 });
 
+/* =========================
+   SERVER GAME LOOP (40 TICK RATE)
+========================= */
+setInterval(() => {
+  for (const roomName in rooms) {
+    const room = rooms[roomName];
+    for (const playerId in room.players) {
+      const player = room.players[playerId];
+      
+      if (player.isDirty) {
+        io.volatile.to(roomName).emit('playerMovedInRoom', { roomName, playerInfo: player });
+        player.isDirty = false; 
+      }
+    }
+  }
+}, 25); 
+
+/* =========================
+   SERVER START
+========================= */
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`SERVER ON HAI! Port ${PORT} par.`);
-});
+server.listen(PORT, () => console.log(`[Server] Running on port ${PORT}`));

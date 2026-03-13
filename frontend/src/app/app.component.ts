@@ -7,7 +7,7 @@ import { GameComponent } from './components/game/game.component';
   selector: 'app-root',
   standalone: true,
   // 2. Yahan humne App ko bataya ki GameComponent use karna hai
-  imports: [RouterOutlet, GameComponent], 
+  imports: [GameComponent], 
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
