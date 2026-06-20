@@ -23,11 +23,30 @@ const rooms = {}; // roomName → RoomObject
 /* =========================
    HELPERS
 ========================= */
-const generateStar = () => ({
-  x: Math.floor(Math.random() * (GAME_WIDTH - 100)) + 50,
-  y: Math.floor(Math.random() * (GAME_HEIGHT - 100)) + 50,
-  active: true
-});
+
+// Center walls occupy roughly x:175-325 and x:475-625 around y:290-310 (from the frontend wall layout).
+// We keep a margin around them so the coin never spawns inside / touching a wall.
+const isInsideWallZone = (x, y) => {
+  const nearCenterY   = y > 260 && y < 340;   // wall's vertical band + margin
+  const nearLeftWall  = x > 160 && x < 340;   // left center wall + margin
+  const nearRightWall = x > 460 && x < 640;   // right center wall + margin
+  return nearCenterY && (nearLeftWall || nearRightWall);
+};
+
+const generateStar = () => {
+  let x, y;
+  let attempts = 0;
+
+  do {
+    // Outer boundary walls sit around the 50px edges — keep an 80px safe margin
+    // so the coin always spawns fully inside the playable area.
+    x = Math.floor(Math.random() * (GAME_WIDTH - 160)) + 80;
+    y = Math.floor(Math.random() * (GAME_HEIGHT - 160)) + 80;
+    attempts++;
+  } while (isInsideWallZone(x, y) && attempts < 20); // safety cap, just in case
+
+  return { x, y, active: true };
+};
 
 const createRoom = (roomName) => {
   rooms[roomName] = { players: {}, star: generateStar(), gameOver: false, created: Date.now() };
@@ -42,7 +61,7 @@ const resetRoom = (room) => {
     p.score = 0;
     p.x = SPAWN_X;
     p.y = SPAWN_Y;
-    p.isDirty = true; 
+    p.isDirty = true;
   }
 };
 
@@ -59,7 +78,7 @@ io.on('connection', (socket) => {
   /* ── JOIN ROOM ── */
   socket.on('joinRoom', ({ roomName, playerName }) => {
     if (!rooms[roomName]) createRoom(roomName);
-    
+
     const room = rooms[roomName];
     if (Object.keys(room.players).length >= MAX_PLAYERS) {
       return socket.emit('serverError', { msg: 'Room is full (max 5 players).' });
@@ -71,7 +90,7 @@ io.on('connection', (socket) => {
       playerName: (playerName || 'Player').slice(0, 20),
       x: SPAWN_X, y: SPAWN_Y, score: 0, isDirty: false
     };
-    
+
     room.players[socket.id] = playerInfo;
     console.log(`[Join] ${playerInfo.playerName} → ${roomName}`);
 
@@ -90,7 +109,7 @@ io.on('connection', (socket) => {
     if (player) {
       player.x = movementData.x;
       player.y = movementData.y;
-      player.isDirty = true; 
+      player.isDirty = true;
     }
   });
 
@@ -117,7 +136,7 @@ io.on('connection', (socket) => {
         if (!activeRoom) return; // Room deleted check
 
         resetRoom(activeRoom);
-        
+
         emitToRoom(roomName, 'gameResetInRoom');
         emitToRoom(roomName, 'currentPlayersInRoom', { players: activeRoom.players });
         emitToRoom(roomName, 'scoreUpdateInRoom', { players: activeRoom.players });
@@ -169,18 +188,17 @@ setInterval(() => {
     const room = rooms[roomName];
     for (const playerId in room.players) {
       const player = room.players[playerId];
-      
+
       if (player.isDirty) {
         io.volatile.to(roomName).emit('playerMovedInRoom', { roomName, playerInfo: player });
-        player.isDirty = false; 
+        player.isDirty = false;
       }
     }
   }
-}, 25); 
+}, 25);
 
 /* =========================
    SERVER START
 ========================= */
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`[Server] Running on port ${PORT}`));
-
