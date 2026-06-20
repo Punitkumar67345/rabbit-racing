@@ -19,21 +19,12 @@ interface StarState {
   active : boolean;
 }
 
-interface MovedPlayer {
-  playerId: string;
-  x       : number;
-  y       : number;
-}
-
-type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
-
 /* ─── Component ──────────────────────────────── */
 
 @Component({
   selector   : 'app-game',
   standalone : true,
   imports    : [CommonModule, FormsModule],
-  styleUrls  : ['./game.component.css'],
 
   template: `
 
@@ -45,15 +36,13 @@ type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
 
         <div class="input-group">
           <label for="playerName">Your Name</label>
-          <input id="playerName" [(ngModel)]="playerName" placeholder="Enter name..." maxlength="20"
-                 autocomplete="off" (keyup.enter)="joinRoom()" />
+          <input id="playerName" [(ngModel)]="playerName" placeholder="Enter name..." maxlength="20" autocomplete="off" />
           <span class="input-border"></span>
         </div>
 
         <div class="input-group">
           <label for="roomName">Room Name</label>
-          <input id="roomName" [(ngModel)]="roomName" placeholder="e.g. room1" maxlength="24"
-                 autocomplete="off" (keyup.enter)="joinRoom()" />
+          <input id="roomName" [(ngModel)]="roomName" placeholder="e.g. room1" maxlength="20" autocomplete="off" />
           <span class="input-border"></span>
         </div>
 
@@ -66,35 +55,265 @@ type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
       </div>
     </div>
 
-    <div *ngIf="gameStarted" id="game-container">
-      <div class="hud-overlay">
-        <button class="leave-btn" (click)="leaveGame()">⟵ Leave</button>
+    <div *ngIf="gameStarted" id="game-container"></div>
 
-        <div class="conn-banner" [class.is-connecting]="connectionStatus === 'connecting'"
-             *ngIf="connectionStatus !== 'connected'">
-          <span class="conn-dot"></span>
-          {{ connectionStatus === 'connecting' ? 'Connecting…' : 'Reconnecting…' }}
-        </div>
+  `,
 
-        <div class="join-error-panel" *ngIf="joinError">
-          <p>{{ joinError }}</p>
-          <button (click)="leaveGame()">Back to Lobby</button>
-        </div>
-      </div>
-    </div>
+  styles: [`
+    /* ── Global Fonts & Reset ── */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@400;600;700&display=swap');
 
-  `
+    :host {
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    /* ── LOBBY BACKGROUND & ANIMATION ── */
+    .lobby {
+      position        : fixed;
+      inset           : 0;
+      display         : flex;
+      align-items     : center;
+      justify-content : center;
+      background      : radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+      overflow        : hidden;
+    }
+
+    .lobby-particles {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image: 
+        radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
+        radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
+        radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+      background-size: 550px 550px, 350px 350px, 250px 250px;
+      background-position: 0 0, 0 0, 0 0;
+      animation: starMove 100s linear infinite;
+      opacity: 0.5;
+      z-index: 0;
+    }
+
+    @keyframes starMove {
+      from { background-position: 0 0, 0 0, 0 0; }
+      to   { background-position: 0 600px, 0 400px, 0 300px; }
+    }
+
+    /* ── GLASSMORPHISM LOBBY CARD ── */
+    .lobby-box {
+      position: relative;
+      z-index: 1;
+      display         : flex;
+      flex-direction  : column;
+      gap             : 18px;
+      background      : rgba(255, 255, 255, 0.03);
+      box-shadow      : 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+      backdrop-filter : blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius   : 24px;
+      border          : 1px solid rgba(255, 255, 255, 0.1);
+      padding         : 45px 40px;
+      width           : 360px;
+      color           : #fff;
+      transition      : transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .lobby-box:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255,255,255,0.05);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* ── TYPOGRAPHY & GLOW ── */
+    .title-glow {
+      font-family: 'Orbitron', sans-serif;
+      margin: 0 0 6px;
+      font-size: 2.2rem;
+      text-align: center;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #0ea5e9, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
+    }
+
+    .sub-glow {
+      margin: 0 0 20px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    /* ── FUTURISTIC INPUTS ── */
+    .input-group {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-group label {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      font-weight: 600;
+      margin-left: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .input-group input {
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 1.1rem;
+      outline: none;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+      transition: all 0.3s ease;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    .input-group input:focus {
+      background: rgba(0, 0, 0, 0.5);
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 0 15px rgba(14, 165, 233, 0.4);
+    }
+
+    .input-border {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      width: 0;
+      background: linear-gradient(90deg, #0ea5e9, #a855f7);
+      transition: width 0.4s ease;
+      border-radius: 0 0 10px 10px;
+    }
+
+    .input-group input:focus ~ .input-border {
+      width: 100%;
+    }
+
+    /* ── LIQUID BUTTON ── */
+    .join-btn {
+      position: relative;
+      margin-top: 15px;
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      overflow: hidden;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-family: 'Orbitron', sans-serif;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    
+    .join-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0ea5e9, #a855f7);
+      z-index: -2;
+    }
+    
+    .join-btn::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px; right: 2px; bottom: 2px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.9);
+      z-index: -1;
+      transition: background 0.3s;
+    }
+
+    .join-btn:hover::after {
+      background: transparent;
+    }
+
+    .join-btn:hover:not(:disabled) {
+      transform: scale(1.03);
+      box-shadow: 0 6px 25px rgba(14, 165, 233, 0.5);
+    }
+
+    .btn-text {
+      position: relative;
+      z-index: 2;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .btn-liquid {
+      position: absolute;
+      top: -80px; left: 0;
+      width: 360px; height: 360px;
+      background: rgba(255,255,255,0.2);
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+      transition: 0.5s;
+      z-index: -1;
+      border-radius: 40%;
+      animation: liquid 4s linear infinite;
+      opacity: 0;
+    }
+
+    .join-btn:hover .btn-liquid {
+      top: -180px;
+      opacity: 1;
+    }
+
+    @keyframes liquid {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .join-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(0.8);
+    }
+
+    .error {
+      color: #ef4444;
+      font-size: 0.9rem;
+      text-align: center;
+      margin-top: 8px;
+      font-weight: 600;
+      text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+    }
+
+    /* ── GAME CONTAINER ── */
+    #game-container {
+      position        : fixed;
+      inset           : 0;
+      width           : 100vw;
+      height          : 100vh;
+      background      : radial-gradient(circle at 30% 30%, #0f172a, #020617);
+      overflow        : hidden;
+    }
+
+    #game-container canvas {
+      border-radius : 18px;
+      box-shadow    :
+        0 0 50px rgba(0,0,0,1),
+        0 0 100px rgba(14, 165, 233, 0.2);
+      margin: auto !important; 
+      display: block;
+    }
+
+  `]
 })
 export class GameComponent implements OnInit, OnDestroy {
 
-  gameStarted      = false;
-  playerName       = '';
-  roomName         = '';
-  serverError      = '';
-  joinError        : string | null = null;
-  connectionStatus : ConnectionStatus = 'connecting';
-
-  private readonly ROOM_NAME_RE = /^[a-zA-Z0-9 _-]{1,24}$/;
+  gameStarted  = false;
+  playerName   = '';
+  roomName     = '';
+  serverError  = '';
 
   private phaserGame : any;
   private socket     : Socket | null = null;
@@ -104,43 +323,14 @@ export class GameComponent implements OnInit, OnDestroy {
   ngOnInit(): void {}
 
   async joinRoom() {
-    const name = this.playerName.trim();
-    const room = this.roomName.trim();
-    if (!name || !room) return;
-
-    if (!this.ROOM_NAME_RE.test(room)) {
-      this.serverError = 'Room name must be 1-24 letters, numbers, spaces, - or _.';
-      return;
-    }
-
-    this.playerName  = name;
-    this.roomName    = room;
+    if (!this.playerName.trim() || !this.roomName.trim()) return;
     this.serverError = '';
-    this.joinError    = null;
-    this.gameStarted  = true;
+    this.gameStarted = true;
     setTimeout(() => this.initGame(), 0);
-  }
-
-  /** Leaves the current game and returns to the lobby, cleaning up the socket + Phaser instance. */
-  leaveGame(): void {
-    if (this.joinError) this.serverError = this.joinError;
-    this.joinError = null;
-
-    this.socket?.removeAllListeners();
-    this.socket?.disconnect();
-    this.socket = null;
-
-    this.phaserGame?.destroy(true);
-    this.phaserGame = null;
-
-    this.gameStarted      = false;
-    this.connectionStatus = 'connecting';
   }
 
   async initGame() {
     if (!isPlatformBrowser(this.platformId)) return;
-
-    const self = this; // capture the component instance for use inside Phaser's scene callbacks
 
     const PhaserImport = await import('phaser');
     const Phaser = (PhaserImport as any).default ?? PhaserImport;
@@ -150,15 +340,15 @@ export class GameComponent implements OnInit, OnDestroy {
 
     /* ── ULTIMATE PERFORMANCE: Force WebSocket (0 Polling Delay) ── */
     this.socket = io(serverUrl, {
-      transports: ['websocket']
+      transports: ['websocket'] 
     });
-
+    
     const socket   = this.socket;
     const roomName = this.roomName;
     const playerName = this.playerName;
 
     let player       : any = null;
-    let otherPlayersMap: Record<string, any> = {}; // O(1) lookups by playerId instead of a Phaser group array
+    let otherPlayersMap: Record<string, any> = {}; // OPTIMIZED: Replaced slow group array with fast Map
     let walls        : any;
     let cursors      : any;
     let wasd         : any;
@@ -174,8 +364,6 @@ export class GameComponent implements OnInit, OnDestroy {
     let winText      : any = null;
     let subText      : any = null;
     let oldPosition  : { x: number; y: number } | undefined;
-    let lastSentAt   = 0;
-    const MOVE_EMIT_INTERVAL_MS = 20; // ~50 sends/sec — under the server's 60/sec cap, smooth at its 40-tick rate
 
     const registerStarOverlap = (scene: any) => {
       if (!player || !star) return;
@@ -199,9 +387,9 @@ export class GameComponent implements OnInit, OnDestroy {
       clearBeforeRender: false,
       powerPreference: 'high-performance',
       fps: {
-        target: 120,
+        target: 120,               
         forceSetTimeOut: true,
-        smoothStep: true
+        smoothStep: true           
       },
       scale: {
         mode      : Phaser.Scale.FIT,
@@ -231,13 +419,13 @@ export class GameComponent implements OnInit, OnDestroy {
             const key = `neonWall_${w}_${h}`;
             if (!scene.textures.exists(key)) {
               const graphics = scene.make.graphics({ x: 0, y: 0, add: false });
-
+              
               graphics.lineStyle(6, 0x0ea5e9, 0.4);
               graphics.strokeRoundedRect(3, 3, w - 6, h - 6, 12);
-
+              
               graphics.fillStyle(0x0284c7, 0.2);
               graphics.fillRoundedRect(3, 3, w - 6, h - 6, 12);
-
+              
               graphics.lineStyle(2, 0x38bdf8, 1);
               graphics.strokeRoundedRect(6, 6, w - 12, h - 12, 8);
 
@@ -261,16 +449,16 @@ export class GameComponent implements OnInit, OnDestroy {
           if (!scene.sys.game.device.os.desktop) {
             const createBtn = (x: number, y: number, text: string) => {
               const container = scene.add.container(x, y).setScrollFactor(0).setDepth(20);
-
+              
               const bg = scene.add.graphics();
               bg.fillStyle(0x0f172a, 0.7);
               bg.lineStyle(2, 0x0ea5e9, 0.8);
               bg.fillRoundedRect(0, 0, 70, 70, 16);
               bg.strokeRoundedRect(0, 0, 70, 70, 16);
-
+              
               const icon = scene.add.text(35, 35, text, { fontSize: '35px' }).setOrigin(0.5);
               container.add([bg, icon]);
-
+              
               const hitArea = scene.add.rectangle(35, 35, 70, 70, 0x000000, 0).setInteractive();
               container.add(hitArea);
 
@@ -363,82 +551,44 @@ export class GameComponent implements OnInit, OnDestroy {
             canCollect = true;
           };
 
-          // Builds/updates the local view of the room from a full player list, without
-          // tearing down and recreating sprites that are still present — this runs on
-          // every join *and* every reconnection resync, so being non-destructive here
-          // is what keeps reconnects from causing a visible flicker for everyone else.
-          const syncPlayers = (players: Record<string, PlayerState>) => {
-            const incomingIds = new Set(Object.keys(players));
-
-            for (const id of Object.keys(otherPlayersMap)) {
-              if (!incomingIds.has(id)) {
-                otherPlayersMap[id].destroy();
-                delete otherPlayersMap[id];
-              }
-            }
-
-            Object.values(players).forEach(pData => {
-              if (pData.playerId === socket.id) {
-                if (!player) {
-                  player = scene.physics.add.sprite(pData.x, pData.y, 'player');
-                  player.setScale(0.15).setTint(0x00ff00).setDepth(5);
-                  player.playerId = pData.playerId;
-                  scene.physics.add.collider(player, walls);
-                  registerStarOverlap(scene);
-                } else {
-                  player.setPosition(pData.x, pData.y);
-                }
-              } else {
-                let other = otherPlayersMap[pData.playerId];
-                if (!other) {
-                  other = scene.physics.add.sprite(pData.x, pData.y, 'player');
-                  other.setScale(0.15).setTint(0xff0000).setDepth(5);
-                  other.playerId = pData.playerId;
-                  otherPlayersMap[pData.playerId] = other;
-                } else {
-                  other.setAlpha(1); // un-ghost in case this was a disconnect/reconnect resync
-                  other.setPosition(pData.x, pData.y);
-                }
-              }
-            });
-
-            updateScoreBoard(players);
-          };
-
           socket.on('connect', () => {
-            self.connectionStatus = 'connected';
-            self.joinError = null;
-
-            if (socket.recovered) {
-              // Same session restored server-side (id, room, score) — it will push a
-              // fresh currentPlayersInRoom/starLocationInRoom on its own; re-joining
-              // here would just overwrite our recovered score with a brand new player.
-              scoreText.setText('Reconnected!');
-            } else {
-              scoreText.setText('Connected! Joining room...');
-              socket.emit('joinRoom', { roomName, playerName });
-            }
-          });
-
-          socket.on('disconnect', () => {
-            self.connectionStatus = 'reconnecting';
+            scoreText.setText('Connected! Joining room...');
+            socket.emit('joinRoom', { roomName, playerName });
           });
 
           socket.on('serverError', ({ msg }: { msg: string }) => {
-            scoreText.setText('⚠ ' + msg);
-            self.joinError = msg;
+            scoreText.setText('Error: ' + msg);
           });
 
           socket.on('currentPlayersInRoom', ({ players }: { players: Record<string, PlayerState> }) => {
-            syncPlayers(players);
+            if (player) { player.destroy(); player = null; }
+            
+            // OPTIMIZED: Clear the map
+            Object.values(otherPlayersMap).forEach(p => p.destroy());
+            otherPlayersMap = {};
+
+            Object.values(players).forEach(pData => {
+              if (pData.playerId === socket.id) {
+                player = scene.physics.add.sprite(pData.x, pData.y, 'player');
+                player.setScale(0.15).setTint(0x00ff00).setDepth(5);
+                player.playerId = pData.playerId;
+                scene.physics.add.collider(player, walls);
+                registerStarOverlap(scene);
+              } else {
+                const other = scene.physics.add.sprite(pData.x, pData.y, 'player');
+                other.setScale(0.15).setTint(0xff0000).setDepth(5);
+                (other as any).playerId = pData.playerId;
+                otherPlayersMap[pData.playerId] = other; // Fast Insert
+              }
+            });
+            updateScoreBoard(players);
           });
 
           socket.on('newPlayerInRoom', ({ playerInfo }: { playerInfo: PlayerState }) => {
-            if (otherPlayersMap[playerInfo.playerId] || playerInfo.playerId === socket.id) return;
             const other = scene.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
             other.setScale(0.15).setTint(0xff0000).setDepth(5);
-            other.playerId = playerInfo.playerId;
-            otherPlayersMap[playerInfo.playerId] = other;
+            (other as any).playerId = playerInfo.playerId;
+            otherPlayersMap[playerInfo.playerId] = other; // Fast Insert
           });
 
           socket.on('starLocationInRoom', ({ star: starData }: { star: StarState }) => {
@@ -449,44 +599,22 @@ export class GameComponent implements OnInit, OnDestroy {
             updateScoreBoard(players);
           });
 
-          // Batched, 40-tick movement broadcast — one event per room per tick covering
-          // every player who moved, instead of one event per player.
-          socket.on('playersMovedInRoom', ({ players: moved }: { players: MovedPlayer[] }) => {
-            for (const p of moved) {
-              if (p.playerId === socket.id) continue; // our own position is already authoritative locally
-              const other = otherPlayersMap[p.playerId];
-              if (!other) continue;
+          socket.on('playerMovedInRoom', ({ playerInfo }: { playerInfo: PlayerState }) => {
+            const other = otherPlayersMap[playerInfo.playerId]; // OPTIMIZED: O(1) Instant Lookup
+            if (other) {
               scene.tweens.killTweensOf(other);
               scene.tweens.add({
                 targets  : other,
-                x        : p.x,
-                y        : p.y,
-                duration : 40,   // slightly above the 25ms tick to smooth over dropped/late packets
+                x        : playerInfo.x,
+                y        : playerInfo.y,
+                duration : 25,          // <-- Perfect Sync: Exact 25ms (Matches backend 40-Tick)
                 ease     : 'Linear'
               });
             }
           });
 
-          // The other player may just be mid network-blip — fade them out rather than
-          // remove them, and only delete for real once the server confirms they're gone.
-          socket.on('playerDisconnectedInRoom', ({ playerId, reconnecting }: { playerId: string; reconnecting?: boolean }) => {
-            const other = otherPlayersMap[playerId];
-            if (!other) return;
-            if (reconnecting) {
-              other.setAlpha(0.35);
-            } else {
-              other.destroy();
-              delete otherPlayersMap[playerId];
-            }
-          });
-
-          socket.on('playerReconnectedInRoom', ({ playerId }: { playerId: string }) => {
-            const other = otherPlayersMap[playerId];
-            if (other) other.setAlpha(1);
-          });
-
-          socket.on('playerLeftInRoom', ({ playerId }: { playerId: string }) => {
-            const other = otherPlayersMap[playerId];
+          socket.on('playerDisconnectedInRoom', ({ playerId }: { playerId: string }) => {
+            const other = otherPlayersMap[playerId]; // OPTIMIZED: O(1) Lookup
             if (other) {
               other.destroy();
               delete otherPlayersMap[playerId];
@@ -528,7 +656,7 @@ export class GameComponent implements OnInit, OnDestroy {
             oldPosition = undefined;
           });
 
-          if (socket.connected && !socket.recovered) {
+          if (socket.connected) {
             socket.emit('joinRoom', { roomName, playerName });
           }
         },
@@ -555,11 +683,9 @@ export class GameComponent implements OnInit, OnDestroy {
             Math.abs(x - oldPosition.x) > 2 ||
             Math.abs(y - oldPosition.y) > 2;
 
-          const now = Date.now();
-          if (moved && now - lastSentAt >= MOVE_EMIT_INTERVAL_MS) {
+          if (moved) {
             socket.emit('playerMovementInRoom', { roomName, movementData: { x, y } });
             oldPosition = { x, y };
-            lastSentAt  = now;
           }
         }
       }
@@ -573,3 +699,4 @@ export class GameComponent implements OnInit, OnDestroy {
     this.phaserGame?.destroy(true);
   }
 }
+
