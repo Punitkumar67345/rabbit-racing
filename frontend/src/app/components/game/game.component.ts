@@ -30,28 +30,56 @@ interface StarState {
 
     <div *ngIf="!gameStarted" class="lobby">
       <div class="lobby-particles"></div>
-      <div class="lobby-box">
-        <h1 class="title-glow">🚀 Space Coin</h1>
+
+      <div class="lobby-box" [class.shake]="shakeError">
+        <div class="logo-badge">🚀</div>
+
+        <h1 class="title-glow">Space Coin</h1>
         <p class="sub sub-glow">Multiplayer coin-collection game</p>
 
         <div class="input-group">
-          <label for="playerName">Your Name</label>
-          <input id="playerName" [(ngModel)]="playerName" placeholder="Enter name..." maxlength="20" autocomplete="off" />
+          <label for="playerName">👤 Your Name</label>
+          <input
+            id="playerName"
+            [(ngModel)]="playerName"
+            placeholder="Enter your name..."
+            maxlength="20"
+            autocomplete="off"
+            autofocus
+            [disabled]="isJoining"
+            (keyup.enter)="focusRoomInput()"
+          />
           <span class="input-border"></span>
+          <span class="char-count">{{ playerName.length }}/20</span>
         </div>
 
         <div class="input-group">
-          <label for="roomName">Room Name</label>
-          <input id="roomName" [(ngModel)]="roomName" placeholder="e.g. room1" maxlength="20" autocomplete="off" />
+          <label for="roomName">🚪 Room Code</label>
+          <input
+            id="roomName"
+            #roomInput
+            [(ngModel)]="roomName"
+            placeholder="e.g. room1"
+            maxlength="20"
+            autocomplete="off"
+            [disabled]="isJoining"
+            (keyup.enter)="joinRoom()"
+          />
           <span class="input-border"></span>
+          <span class="char-count">{{ roomName.length }}/20</span>
         </div>
 
-        <button (click)="joinRoom()" [disabled]="!playerName || !roomName" class="join-btn">
-          <span class="btn-text">Join / Create Room</span>
+        <p class="hint">💡 Same room code = same game room. Up to 5 players.</p>
+
+        <button (click)="joinRoom()" [disabled]="!canJoin || isJoining" class="join-btn">
+          <span class="btn-text" *ngIf="!isJoining">Join / Create Room</span>
+          <span class="btn-text btn-loading" *ngIf="isJoining">
+            <span class="spinner"></span> Connecting...
+          </span>
           <div class="btn-liquid"></div>
         </button>
 
-        <p *ngIf="serverError" class="error">{{ serverError }}</p>
+        <p *ngIf="serverError" class="error">⚠️ {{ serverError }}</p>
       </div>
     </div>
 
@@ -76,6 +104,8 @@ interface StarState {
       justify-content : center;
       background      : radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
       overflow        : hidden;
+      padding         : 20px;
+      box-sizing      : border-box;
     }
 
     .lobby-particles {
@@ -103,17 +133,24 @@ interface StarState {
       z-index: 1;
       display         : flex;
       flex-direction  : column;
-      gap             : 18px;
+      gap             : 16px;
       background      : rgba(255, 255, 255, 0.03);
       box-shadow      : 0 8px 32px 0 rgba(0, 0, 0, 0.3);
       backdrop-filter : blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-radius   : 24px;
       border          : 1px solid rgba(255, 255, 255, 0.1);
-      padding         : 45px 40px;
-      width           : 360px;
+      padding         : 42px 36px;
+      width           : 100%;
+      max-width       : 380px;
       color           : #fff;
       transition      : transform 0.3s ease, box-shadow 0.3s ease;
+      animation       : floatIn 0.5s ease;
+    }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .lobby-box:hover {
@@ -122,11 +159,38 @@ interface StarState {
       border-color: rgba(255, 255, 255, 0.2);
     }
 
+    .lobby-box.shake {
+      animation: shakeBox 0.4s ease;
+    }
+
+    @keyframes shakeBox {
+      0%, 100% { transform: translateX(0); }
+      20%      { transform: translateX(-8px); }
+      40%      { transform: translateX(8px); }
+      60%      { transform: translateX(-6px); }
+      80%      { transform: translateX(6px); }
+    }
+
+    /* ── LOGO BADGE ── */
+    .logo-badge {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(14,165,233,0.25), rgba(168,85,247,0.25));
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 0 25px rgba(14, 165, 233, 0.25);
+    }
+
     /* ── TYPOGRAPHY & GLOW ── */
     .title-glow {
       font-family: 'Orbitron', sans-serif;
-      margin: 0 0 6px;
-      font-size: 2.2rem;
+      margin: 0 0 2px;
+      font-size: 2.1rem;
       text-align: center;
       letter-spacing: 1px;
       background: linear-gradient(90deg, #0ea5e9, #a855f7);
@@ -136,10 +200,10 @@ interface StarState {
     }
 
     .sub-glow {
-      margin: 0 0 20px;
+      margin: 0 0 10px;
       text-align: center;
       color: #94a3b8;
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 1.5px;
@@ -175,9 +239,18 @@ interface StarState {
       font-family: 'Rajdhani', sans-serif;
     }
 
+    .input-group input::placeholder {
+      color: #64748b;
+    }
+
     .input-group input:focus {
       background: rgba(0, 0, 0, 0.5);
       box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 0 15px rgba(14, 165, 233, 0.4);
+    }
+
+    .input-group input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .input-border {
@@ -195,10 +268,27 @@ interface StarState {
       width: 100%;
     }
 
+    .char-count {
+      position: absolute;
+      right: 4px;
+      bottom: -18px;
+      font-size: 0.7rem;
+      color: #475569;
+      letter-spacing: 0.5px;
+    }
+
+    .hint {
+      margin: 0;
+      font-size: 0.8rem;
+      color: #64748b;
+      text-align: center;
+      line-height: 1.4;
+    }
+
     /* ── LIQUID BUTTON ── */
     .join-btn {
       position: relative;
-      margin-top: 15px;
+      margin-top: 6px;
       padding: 16px;
       border-radius: 12px;
       border: none;
@@ -247,12 +337,33 @@ interface StarState {
       position: relative;
       z-index: 2;
       text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-loading {
+      font-size: 1rem;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     .btn-liquid {
       position: absolute;
       top: -80px; left: 0;
-      width: 360px; height: 360px;
+      width: 380px; height: 380px;
       background: rgba(255,255,255,0.2);
       box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
       transition: 0.5s;
@@ -282,7 +393,7 @@ interface StarState {
       color: #ef4444;
       font-size: 0.9rem;
       text-align: center;
-      margin-top: 8px;
+      margin-top: 4px;
       font-weight: 600;
       text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
     }
@@ -314,6 +425,8 @@ export class GameComponent implements OnInit, OnDestroy {
   playerName   = '';
   roomName     = '';
   serverError  = '';
+  isJoining    = false;
+  shakeError   = false;
 
   private phaserGame : any;
   private socket     : Socket | null = null;
@@ -322,11 +435,37 @@ export class GameComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {}
 
+  get canJoin(): boolean {
+    return this.playerName.trim().length > 0 && this.roomName.trim().length > 0;
+  }
+
+  focusRoomInput(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const el = document.getElementById('roomName');
+    el?.focus();
+  }
+
+  private triggerShake(): void {
+    this.shakeError = true;
+    setTimeout(() => (this.shakeError = false), 400);
+  }
+
   async joinRoom() {
-    if (!this.playerName.trim() || !this.roomName.trim()) return;
+    if (!this.canJoin || this.isJoining) {
+      if (!this.canJoin) this.triggerShake();
+      return;
+    }
+
+    this.playerName = this.playerName.trim();
+    this.roomName   = this.roomName.trim();
     this.serverError = '';
-    this.gameStarted = true;
-    setTimeout(() => this.initGame(), 0);
+    this.isJoining    = true;
+
+    // Small delay so the loading state is visible before the canvas mounts
+    setTimeout(() => {
+      this.gameStarted = true;
+      setTimeout(() => this.initGame(), 0);
+    }, 250);
   }
 
   async initGame() {
@@ -699,4 +838,3 @@ export class GameComponent implements OnInit, OnDestroy {
     this.phaserGame?.destroy(true);
   }
 }
-
