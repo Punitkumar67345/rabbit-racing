@@ -29,57 +29,119 @@ interface StarState {
   template: `
 
     <div *ngIf="!gameStarted" class="lobby">
-      <div class="lobby-particles"></div>
 
-      <div class="lobby-box" [class.shake]="shakeError">
-        <div class="logo-badge">🚀</div>
+      <!-- Animated star field layers -->
+      <div class="stars-sm"></div>
+      <div class="stars-md"></div>
+      <div class="stars-lg"></div>
 
-        <h1 class="title-glow">Space Coin</h1>
-        <p class="sub sub-glow">Multiplayer coin-collection game</p>
+      <!-- Ambient glow orbs -->
+      <div class="orb orb-red"></div>
+      <div class="orb orb-blue"></div>
+      <div class="orb orb-red2"></div>
 
-        <div class="input-group">
-          <label for="playerName">👤 Your Name</label>
-          <input
-            id="playerName"
-            [(ngModel)]="playerName"
-            placeholder="Enter your name..."
-            maxlength="20"
-            autocomplete="off"
-            autofocus
-            [disabled]="isJoining"
-            (keyup.enter)="focusRoomInput()"
-          />
-          <span class="input-border"></span>
-          <span class="char-count">{{ playerName.length }}/20</span>
+      <!-- Lobby Card -->
+      <div class="lobby-card" [class.shake]="shakeError">
+
+        <!-- Corner accent lines -->
+        <span class="corner corner-tl"></span>
+        <span class="corner corner-tr"></span>
+        <span class="corner corner-bl"></span>
+        <span class="corner corner-br"></span>
+
+        <!-- Logo -->
+        <div class="logo-wrap">
+          <div class="logo-ring-outer">
+            <div class="logo-ring-inner">🚀</div>
+          </div>
         </div>
 
-        <div class="input-group">
-          <label for="roomName">🚪 Room Code</label>
-          <input
-            id="roomName"
-            #roomInput
-            [(ngModel)]="roomName"
-            placeholder="e.g. room1"
-            maxlength="20"
-            autocomplete="off"
-            [disabled]="isJoining"
-            (keyup.enter)="joinRoom()"
-          />
-          <span class="input-border"></span>
-          <span class="char-count">{{ roomName.length }}/20</span>
+        <!-- Title -->
+        <h1 class="title">Space Coin</h1>
+        <p class="subtitle">Multiplayer Coin Collection</p>
+
+        <div class="divider"></div>
+
+        <!-- Player Name Input -->
+        <div class="field-group">
+          <label class="field-label" for="playerName">
+            <span class="label-dot"></span> Your Name
+          </label>
+          <div class="input-wrap">
+            <input
+              id="playerName"
+              [(ngModel)]="playerName"
+              placeholder="Enter your callsign..."
+              maxlength="20"
+              autocomplete="off"
+              autofocus
+              [disabled]="isJoining"
+              (keyup.enter)="focusRoomInput()"
+            />
+            <span class="input-glow-line"></span>
+            <span class="char-count">{{ playerName.length }}/20</span>
+          </div>
         </div>
 
-        <p class="hint">💡 Same room code = same game room. Up to 5 players.</p>
+        <!-- Room Code Input -->
+        <div class="field-group">
+          <label class="field-label" for="roomName">
+            <span class="label-dot label-dot-blue"></span> Room Code
+          </label>
+          <div class="input-wrap">
+            <input
+              id="roomName"
+              #roomInput
+              [(ngModel)]="roomName"
+              placeholder="e.g. alpha-7"
+              maxlength="20"
+              autocomplete="off"
+              [disabled]="isJoining"
+              (keyup.enter)="joinRoom()"
+            />
+            <span class="input-glow-line glow-blue"></span>
+            <span class="char-count">{{ roomName.length }}/20</span>
+          </div>
+        </div>
 
-        <button (click)="joinRoom()" [disabled]="!canJoin || isJoining" class="join-btn">
-          <span class="btn-text" *ngIf="!isJoining">Join / Create Room</span>
-          <span class="btn-text btn-loading" *ngIf="isJoining">
-            <span class="spinner"></span> Connecting...
+        <!-- Hint -->
+        <div class="hint-box">
+          <span class="hint-icon">◈</span>
+          Same room code = same game room &nbsp;·&nbsp; Up to 5 players
+        </div>
+
+        <!-- Join Button -->
+        <button
+          (click)="joinRoom()"
+          [disabled]="!canJoin || isJoining"
+          class="join-btn"
+          [class.btn-loading-state]="isJoining"
+        >
+          <span class="btn-bg-gradient"></span>
+          <span class="btn-shimmer"></span>
+          <span class="btn-content">
+            <ng-container *ngIf="!isJoining">
+              <span class="btn-icon">⊕</span>
+              Join / Create Room
+            </ng-container>
+            <ng-container *ngIf="isJoining">
+              <span class="spinner"></span>
+              Establishing Link...
+            </ng-container>
           </span>
-          <div class="btn-liquid"></div>
         </button>
 
-        <p *ngIf="serverError" class="error">⚠️ {{ serverError }}</p>
+        <!-- Error -->
+        <p *ngIf="serverError" class="error-msg">
+          <span class="error-icon">⚠</span> {{ serverError }}
+        </p>
+
+        <!-- Status footer -->
+        <div class="status-footer">
+          <span class="status-dot" [class.connected]="false"></span>
+          Awaiting connection
+        </div>
+
       </div>
     </div>
 
@@ -88,333 +150,538 @@ interface StarState {
   `,
 
   styles: [`
-    /* ── Global Fonts & Reset ── */
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@400;600;700&display=swap');
+
+    /* ══════════════════════════════════════
+       LOBBY BACKGROUND
+    ══════════════════════════════════════ */
 
     :host {
       font-family: 'Rajdhani', sans-serif;
     }
 
-    /* ── LOBBY BACKGROUND & ANIMATION ── */
     .lobby {
       position        : fixed;
       inset           : 0;
       display         : flex;
       align-items     : center;
       justify-content : center;
-      background      : radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+      background      : radial-gradient(ellipse at 25% 75%, #180808 0%, #080812 55%, #080410 100%);
       overflow        : hidden;
       padding         : 20px;
       box-sizing      : border-box;
     }
 
-    .lobby-particles {
+    /* ── Parallax star layers ── */
+    .stars-sm,
+    .stars-md,
+    .stars-lg {
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background-image: 
-        radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
-        radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
-        radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
-      background-size: 550px 550px, 350px 350px, 250px 250px;
-      background-position: 0 0, 0 0, 0 0;
-      animation: starMove 100s linear infinite;
-      opacity: 0.5;
+      inset: 0;
       z-index: 0;
+      pointer-events: none;
     }
 
-    @keyframes starMove {
-      from { background-position: 0 0, 0 0, 0 0; }
-      to   { background-position: 0 600px, 0 400px, 0 300px; }
+    .stars-sm {
+      background-image: radial-gradient(rgba(255,160,160,0.85) 1px, transparent 1px),
+                        radial-gradient(rgba(160,200,255,0.7) 1px, transparent 1px);
+      background-size: 80px 80px, 130px 130px;
+      background-position: 0 0, 40px 40px;
+      animation: drift1 90s linear infinite;
+      opacity: 0.45;
     }
 
-    /* ── GLASSMORPHISM LOBBY CARD ── */
-    .lobby-box {
-      position: relative;
-      z-index: 1;
-      display         : flex;
-      flex-direction  : column;
-      gap             : 16px;
-      background      : rgba(255, 255, 255, 0.03);
-      box-shadow      : 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-      backdrop-filter : blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-radius   : 24px;
-      border          : 1px solid rgba(255, 255, 255, 0.1);
-      padding         : 42px 36px;
-      width           : 100%;
-      max-width       : 380px;
-      color           : #fff;
-      transition      : transform 0.3s ease, box-shadow 0.3s ease;
-      animation       : floatIn 0.5s ease;
+    .stars-md {
+      background-image: radial-gradient(rgba(255,100,100,0.6) 1.5px, transparent 1.5px),
+                        radial-gradient(rgba(80,130,255,0.5) 1px, transparent 1px);
+      background-size: 160px 160px, 220px 220px;
+      background-position: 20px 20px, 80px 80px;
+      animation: drift2 140s linear infinite;
+      opacity: 0.35;
     }
 
-    @keyframes floatIn {
-      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    .stars-lg {
+      background-image: radial-gradient(rgba(255,200,200,0.4) 2px, transparent 2px);
+      background-size: 300px 300px;
+      background-position: 60px 60px;
+      animation: drift1 200s linear infinite;
+      opacity: 0.2;
+    }
+
+    @keyframes drift1 {
+      from { background-position: 0 0, 40px 40px; }
+      to   { background-position: 0 500px, 40px 540px; }
+    }
+
+    @keyframes drift2 {
+      from { background-position: 20px 20px, 80px 80px; }
+      to   { background-position: 20px 550px, 80px 620px; }
+    }
+
+    /* ── Ambient glow orbs ── */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(60px);
+    }
+
+    .orb-red {
+      width: 400px; height: 400px;
+      bottom: -120px; left: -80px;
+      background: radial-gradient(circle, rgba(200,35,35,0.22) 0%, transparent 70%);
+      animation: breathe 8s ease-in-out infinite;
+    }
+
+    .orb-blue {
+      width: 350px; height: 350px;
+      top: -100px; right: -60px;
+      background: radial-gradient(circle, rgba(35,80,210,0.18) 0%, transparent 70%);
+      animation: breathe 10s ease-in-out infinite reverse;
+    }
+
+    .orb-red2 {
+      width: 200px; height: 200px;
+      top: 40%; right: 10%;
+      background: radial-gradient(circle, rgba(180,30,30,0.1) 0%, transparent 70%);
+      animation: breathe 6s ease-in-out infinite 2s;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50%       { opacity: 1;   transform: scale(1.15); }
+    }
+
+    /* ══════════════════════════════════════
+       GLASSMORPHISM CARD
+    ══════════════════════════════════════ */
+
+    .lobby-card {
+      position          : relative;
+      z-index           : 1;
+      display           : flex;
+      flex-direction    : column;
+      align-items       : stretch;
+      gap               : 16px;
+      width             : 100%;
+      max-width         : 370px;
+      padding           : 40px 32px;
+      border-radius     : 26px;
+      background        : linear-gradient(
+        140deg,
+        rgba(200,35,35,0.07) 0%,
+        rgba(12,12,28,0.72) 35%,
+        rgba(25,55,180,0.07) 100%
+      );
+      border            : 1px solid rgba(210,60,60,0.28);
+      box-shadow        :
+        inset 0 0 0 1px rgba(80,130,255,0.07),
+        0 25px 70px rgba(0,0,0,0.65),
+        0 0 50px rgba(180,30,30,0.09);
+      backdrop-filter   : blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      color             : #fff;
+      animation         : cardIn 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
+      transition        : border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .lobby-card:hover {
+      border-color: rgba(210,60,60,0.42);
+      box-shadow:
+        inset 0 0 0 1px rgba(80,130,255,0.12),
+        0 30px 80px rgba(0,0,0,0.7),
+        0 0 60px rgba(180,30,30,0.14);
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(22px) scale(0.97); }
       to   { opacity: 1; transform: translateY(0) scale(1); }
     }
 
-    .lobby-box:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255,255,255,0.05);
-      border-color: rgba(255, 255, 255, 0.2);
+    /* Shake animation on error */
+    .lobby-card.shake {
+      animation: shakeCard 0.45s ease;
     }
 
-    .lobby-box.shake {
-      animation: shakeBox 0.4s ease;
+    @keyframes shakeCard {
+      0%,100% { transform: translateX(0); }
+      15%     { transform: translateX(-9px); }
+      35%     { transform: translateX(9px); }
+      55%     { transform: translateX(-6px); }
+      75%     { transform: translateX(6px); }
     }
 
-    @keyframes shakeBox {
-      0%, 100% { transform: translateX(0); }
-      20%      { transform: translateX(-8px); }
-      40%      { transform: translateX(8px); }
-      60%      { transform: translateX(-6px); }
-      80%      { transform: translateX(6px); }
+    /* ── Corner accent lines ── */
+    .corner {
+      position: absolute;
+      width: 18px; height: 18px;
+      pointer-events: none;
     }
 
-    /* ── LOGO BADGE ── */
-    .logo-badge {
-      width: 64px;
-      height: 64px;
-      margin: 0 auto 4px;
+    .corner-tl { top: 13px; left: 13px; border-top: 1.5px solid rgba(210,60,60,0.5); border-left: 1.5px solid rgba(210,60,60,0.5); border-radius: 5px 0 0 0; }
+    .corner-tr { top: 13px; right: 13px; border-top: 1.5px solid rgba(70,120,220,0.45); border-right: 1.5px solid rgba(70,120,220,0.45); border-radius: 0 5px 0 0; }
+    .corner-bl { bottom: 13px; left: 13px; border-bottom: 1.5px solid rgba(70,120,220,0.45); border-left: 1.5px solid rgba(70,120,220,0.45); border-radius: 0 0 0 5px; }
+    .corner-br { bottom: 13px; right: 13px; border-bottom: 1.5px solid rgba(210,60,60,0.5); border-right: 1.5px solid rgba(210,60,60,0.5); border-radius: 0 0 5px 0; }
+
+    /* ── Logo ── */
+    .logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 2px;
+    }
+
+    .logo-ring-outer {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(200,35,35,0.18), rgba(35,80,210,0.18));
+      border: 1.5px solid rgba(200,50,50,0.45);
+      box-shadow:
+        0 0 24px rgba(190,30,30,0.22),
+        0 0 50px rgba(35,80,210,0.12),
+        inset 0 0 18px rgba(200,40,40,0.06);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 30px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, rgba(14,165,233,0.25), rgba(168,85,247,0.25));
-      border: 1px solid rgba(255,255,255,0.15);
-      box-shadow: 0 0 25px rgba(14, 165, 233, 0.25);
+      position: relative;
+      animation: logoPulse 4s ease-in-out infinite;
     }
 
-    /* ── TYPOGRAPHY & GLOW ── */
-    .title-glow {
-      font-family: 'Orbitron', sans-serif;
-      margin: 0 0 2px;
-      font-size: 2.1rem;
-      text-align: center;
-      letter-spacing: 1px;
-      background: linear-gradient(90deg, #0ea5e9, #a855f7);
+    @keyframes logoPulse {
+      0%,100% { box-shadow: 0 0 24px rgba(190,30,30,0.22), 0 0 50px rgba(35,80,210,0.12), inset 0 0 18px rgba(200,40,40,0.06); }
+      50%     { box-shadow: 0 0 35px rgba(190,30,30,0.38), 0 0 65px rgba(35,80,210,0.2),  inset 0 0 25px rgba(200,40,40,0.1); }
+    }
+
+    .logo-ring-outer::after {
+      content: '';
+      position: absolute; inset: -5px;
+      border-radius: 50%;
+      border: 1px solid rgba(80,130,255,0.2);
+      animation: ringExpand 4s ease-in-out infinite;
+    }
+
+    @keyframes ringExpand {
+      0%,100% { transform: scale(1); opacity: 0.4; }
+      50%     { transform: scale(1.08); opacity: 0.9; }
+    }
+
+    .logo-ring-inner {
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    /* ── Typography ── */
+    .title {
+      font-family : 'Orbitron', sans-serif;
+      font-size   : 2rem;
+      font-weight : 700;
+      text-align  : center;
+      letter-spacing: 2px;
+      margin      : 0;
+      background  : linear-gradient(90deg, #e05555 0%, #c03535 30%, #6a9fff 70%, #4a7fee 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      text-shadow: 0 0 15px rgba(14, 165, 233, 0.4);
     }
 
-    .sub-glow {
-      margin: 0 0 10px;
-      text-align: center;
-      color: #94a3b8;
-      font-size: 0.95rem;
-      font-weight: 600;
+    .subtitle {
+      text-align   : center;
+      font-family  : 'Rajdhani', sans-serif;
+      font-size    : 0.78rem;
+      color        : rgba(185,130,130,0.85);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 2.8px;
+      font-weight  : 700;
+      margin       : -8px 0 0;
     }
 
-    /* ── FUTURISTIC INPUTS ── */
-    .input-group {
-      position: relative;
-      display: flex;
+    .divider {
+      height     : 1px;
+      background : linear-gradient(90deg, transparent 0%, rgba(200,55,55,0.35) 25%, rgba(55,100,220,0.35) 75%, transparent 100%);
+      margin     : 2px 0;
+    }
+
+    /* ── Fields ── */
+    .field-group {
+      display       : flex;
       flex-direction: column;
-      gap: 6px;
+      gap           : 7px;
     }
 
-    .input-group label {
-      font-size: 0.9rem;
-      color: #cbd5e1;
-      font-weight: 600;
-      margin-left: 4px;
+    .field-label {
+      display      : flex;
+      align-items  : center;
+      gap          : 7px;
+      font-family  : 'Rajdhani', sans-serif;
+      font-size    : 0.74rem;
+      color        : rgba(180,148,148,0.9);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 1.4px;
+      font-weight  : 700;
+      margin-left  : 2px;
     }
 
-    .input-group input {
-      padding: 14px 16px;
-      border-radius: 10px;
-      border: none;
-      background: rgba(0, 0, 0, 0.3);
-      color: #fff;
-      font-size: 1.1rem;
-      outline: none;
-      box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
-      transition: all 0.3s ease;
-      font-family: 'Rajdhani', sans-serif;
-    }
-
-    .input-group input::placeholder {
-      color: #64748b;
-    }
-
-    .input-group input:focus {
-      background: rgba(0, 0, 0, 0.5);
-      box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 0 15px rgba(14, 165, 233, 0.4);
-    }
-
-    .input-group input:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .input-border {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 2px;
-      width: 0;
-      background: linear-gradient(90deg, #0ea5e9, #a855f7);
-      transition: width 0.4s ease;
-      border-radius: 0 0 10px 10px;
-    }
-
-    .input-group input:focus ~ .input-border {
-      width: 100%;
-    }
-
-    .char-count {
-      position: absolute;
-      right: 4px;
-      bottom: -18px;
-      font-size: 0.7rem;
-      color: #475569;
-      letter-spacing: 0.5px;
-    }
-
-    .hint {
-      margin: 0;
-      font-size: 0.8rem;
-      color: #64748b;
-      text-align: center;
-      line-height: 1.4;
-    }
-
-    /* ── LIQUID BUTTON ── */
-    .join-btn {
-      position: relative;
-      margin-top: 6px;
-      padding: 16px;
-      border-radius: 12px;
-      border: none;
-      background: transparent;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      overflow: hidden;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      font-family: 'Orbitron', sans-serif;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    
-    .join-btn::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #0ea5e9, #a855f7);
-      z-index: -2;
-    }
-    
-    .join-btn::after {
-      content: '';
-      position: absolute;
-      top: 2px; left: 2px; right: 2px; bottom: 2px;
-      border-radius: 10px;
-      background: rgba(15, 23, 42, 0.9);
-      z-index: -1;
-      transition: background 0.3s;
-    }
-
-    .join-btn:hover::after {
-      background: transparent;
-    }
-
-    .join-btn:hover:not(:disabled) {
-      transform: scale(1.03);
-      box-shadow: 0 6px 25px rgba(14, 165, 233, 0.5);
-    }
-
-    .btn-text {
-      position: relative;
-      z-index: 2;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    .btn-loading {
-      font-size: 1rem;
-    }
-
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
+    .label-dot {
+      width: 5px; height: 5px;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      background: linear-gradient(135deg, #c03535, #8b1e1e);
+      box-shadow: 0 0 5px rgba(190,30,30,0.5);
+      flex-shrink: 0;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .label-dot-blue {
+      background: linear-gradient(135deg, #4a7fee, #2a50c0);
+      box-shadow: 0 0 5px rgba(60,100,220,0.5);
     }
 
-    .btn-liquid {
-      position: absolute;
-      top: -80px; left: 0;
-      width: 380px; height: 380px;
-      background: rgba(255,255,255,0.2);
-      box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
-      transition: 0.5s;
-      z-index: -1;
-      border-radius: 40%;
-      animation: liquid 4s linear infinite;
-      opacity: 0;
+    .input-wrap {
+      position: relative;
     }
 
-    .join-btn:hover .btn-liquid {
-      top: -180px;
+    .input-wrap input {
+      width            : 100%;
+      padding          : 13px 15px;
+      background       : rgba(6,6,18,0.65);
+      border           : 1px solid rgba(180,45,45,0.32);
+      border-radius    : 10px;
+      color            : rgba(255,240,240,0.95);
+      font-size        : 1.05rem;
+      font-family      : 'Rajdhani', sans-serif;
+      font-weight      : 600;
+      outline          : none;
+      box-shadow       : inset 0 2px 8px rgba(0,0,0,0.45);
+      transition       : border-color 0.3s, box-shadow 0.3s;
+      caret-color      : #e05555;
+    }
+
+    .input-wrap input::placeholder {
+      color: rgba(130,100,100,0.55);
+      font-weight: 400;
+    }
+
+    .input-wrap input:focus {
+      border-color: rgba(80,130,255,0.5);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.45), 0 0 18px rgba(55,100,215,0.18);
+    }
+
+    .input-wrap input:focus ~ .input-glow-line {
+      transform: scaleX(1);
       opacity: 1;
     }
 
-    @keyframes liquid {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    .input-wrap input:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .input-glow-line {
+      position     : absolute;
+      bottom       : 0; left: 10px; right: 10px;
+      height       : 1.5px;
+      background   : linear-gradient(90deg, #c03535, #4a7fee);
+      border-radius: 0 0 10px 10px;
+      transform    : scaleX(0);
+      opacity      : 0;
+      transition   : transform 0.4s ease, opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .glow-blue {
+      background: linear-gradient(90deg, #4a7fee, #c03535);
+    }
+
+    .char-count {
+      position    : absolute;
+      right       : 6px;
+      bottom      : -17px;
+      font-size   : 0.65rem;
+      font-family : 'Rajdhani', sans-serif;
+      color       : rgba(120,100,100,0.5);
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Hint ── */
+    .hint-box {
+      background   : rgba(190,35,35,0.06);
+      border       : 1px solid rgba(190,50,50,0.18);
+      border-left  : 2px solid rgba(190,50,50,0.45);
+      border-radius: 8px;
+      padding      : 9px 13px;
+      font-family  : 'Rajdhani', sans-serif;
+      font-size    : 0.78rem;
+      color        : rgba(170,140,140,0.8);
+      line-height  : 1.5;
+      display      : flex;
+      align-items  : center;
+      gap          : 8px;
+    }
+
+    .hint-icon {
+      color: rgba(190,60,60,0.7);
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    /* ── Join Button ── */
+    .join-btn {
+      position      : relative;
+      overflow      : hidden;
+      padding       : 15px 20px;
+      border-radius : 12px;
+      border        : 1px solid rgba(180,45,45,0.55);
+      background    : rgba(10,10,22,0.85);
+      color         : #fff;
+      font-family   : 'Orbitron', sans-serif;
+      font-size     : 0.82rem;
+      font-weight   : 700;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      cursor        : pointer;
+      transition    : transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+      box-shadow    : 0 4px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+      margin-top    : 4px;
+    }
+
+    .btn-bg-gradient {
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(180,30,30,0.18) 0%, rgba(30,65,185,0.18) 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .btn-shimmer {
+      position: absolute;
+      top: 0; left: -120%;
+      width: 70%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.055), transparent);
+      pointer-events: none;
+    }
+
+    .join-btn:not(:disabled) .btn-shimmer {
+      animation: btnShimmer 2.8s ease infinite 1s;
+    }
+
+    @keyframes btnShimmer {
+      0%   { left: -120%; }
+      100% { left: 200%; }
+    }
+
+    .btn-content {
+      position    : relative;
+      z-index     : 2;
+      display     : flex;
+      align-items : center;
+      justify-content: center;
+      gap         : 10px;
+    }
+
+    .btn-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .join-btn:hover:not(:disabled) {
+      transform   : translateY(-2px) scale(1.01);
+      border-color: rgba(200,55,55,0.75);
+      box-shadow  : 0 8px 30px rgba(0,0,0,0.5), 0 0 25px rgba(180,30,30,0.22);
+    }
+
+    .join-btn:hover:not(:disabled) .btn-bg-gradient {
+      opacity: 1;
+    }
+
+    .join-btn:active:not(:disabled) {
+      transform: translateY(0) scale(0.99);
     }
 
     .join-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      filter: grayscale(0.8);
+      opacity: 0.4;
+      cursor : not-allowed;
+      filter : grayscale(0.6);
     }
 
-    .error {
-      color: #ef4444;
-      font-size: 0.9rem;
-      text-align: center;
-      margin-top: 4px;
-      font-weight: 600;
-      text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+    /* ── Spinner ── */
+    .spinner {
+      display     : inline-block;
+      width       : 15px;
+      height      : 15px;
+      border      : 2px solid rgba(255,255,255,0.25);
+      border-top-color: rgba(255,160,160,0.9);
+      border-radius: 50%;
+      animation   : spin 0.65s linear infinite;
     }
 
-    /* ── GAME CONTAINER ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error ── */
+    .error-msg {
+      display     : flex;
+      align-items : center;
+      gap         : 7px;
+      font-family : 'Rajdhani', sans-serif;
+      font-size   : 0.88rem;
+      font-weight : 600;
+      color       : #f06060;
+      text-align  : center;
+      justify-content: center;
+      text-shadow : 0 0 8px rgba(220,50,50,0.4);
+      margin      : 0;
+    }
+
+    .error-icon {
+      font-size: 1rem;
+    }
+
+    /* ── Status footer ── */
+    .status-footer {
+      display     : flex;
+      align-items : center;
+      justify-content: center;
+      gap         : 7px;
+      font-family : 'Rajdhani', sans-serif;
+      font-size   : 0.7rem;
+      color       : rgba(130,110,110,0.55);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #c03535;
+      animation: dotBlink 1.8s ease-in-out infinite;
+    }
+
+    .status-dot.connected {
+      background: #30c060;
+      animation: dotBlink 1.8s ease-in-out infinite;
+    }
+
+    @keyframes dotBlink {
+      0%,100% { opacity: 0.3; }
+      50%     { opacity: 1; }
+    }
+
+    /* ══════════════════════════════════════
+       GAME CONTAINER
+    ══════════════════════════════════════ */
+
     #game-container {
-      position        : fixed;
-      inset           : 0;
-      width           : 100vw;
-      height          : 100vh;
-      background      : radial-gradient(circle at 30% 30%, #0f172a, #020617);
-      overflow        : hidden;
+      position   : fixed;
+      inset      : 0;
+      width      : 100vw;
+      height     : 100vh;
+      background : radial-gradient(ellipse at 20% 80%, #180808 0%, #080812 55%, #080410 100%);
+      overflow   : hidden;
     }
 
     #game-container canvas {
       border-radius : 18px;
       box-shadow    :
-        0 0 50px rgba(0,0,0,1),
-        0 0 100px rgba(14, 165, 233, 0.2);
-      margin: auto !important; 
-      display: block;
+        0 0 60px rgba(0,0,0,0.9),
+        0 0 80px rgba(190,30,30,0.12),
+        0 0 120px rgba(35,80,210,0.1);
+      margin        : auto !important;
+      display       : block;
     }
 
   `]
@@ -447,7 +714,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private triggerShake(): void {
     this.shakeError = true;
-    setTimeout(() => (this.shakeError = false), 400);
+    setTimeout(() => (this.shakeError = false), 450);
   }
 
   async joinRoom() {
@@ -456,12 +723,11 @@ export class GameComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.playerName = this.playerName.trim();
-    this.roomName   = this.roomName.trim();
+    this.playerName  = this.playerName.trim();
+    this.roomName    = this.roomName.trim();
     this.serverError = '';
-    this.isJoining    = true;
+    this.isJoining   = true;
 
-    // Small delay so the loading state is visible before the canvas mounts
     setTimeout(() => {
       this.gameStarted = true;
       setTimeout(() => this.initGame(), 0);
@@ -479,20 +745,20 @@ export class GameComponent implements OnInit, OnDestroy {
 
     /* ── ULTIMATE PERFORMANCE: Force WebSocket (0 Polling Delay) ── */
     this.socket = io(serverUrl, {
-      transports: ['websocket'] 
+      transports: ['websocket']
     });
-    
-    const socket   = this.socket;
-    const roomName = this.roomName;
+
+    const socket     = this.socket;
+    const roomName   = this.roomName;
     const playerName = this.playerName;
 
-    let player       : any = null;
-    let otherPlayersMap: Record<string, any> = {}; // OPTIMIZED: Replaced slow group array with fast Map
-    let walls        : any;
-    let cursors      : any;
-    let wasd         : any;
-    let star         : any;
-    let scoreText    : any;
+    let player          : any = null;
+    let otherPlayersMap : Record<string, any> = {};
+    let walls           : any;
+    let cursors         : any;
+    let wasd            : any;
+    let star            : any;
+    let scoreText       : any;
 
     let isTouchLeft  = false;
     let isTouchRight = false;
@@ -526,9 +792,9 @@ export class GameComponent implements OnInit, OnDestroy {
       clearBeforeRender: false,
       powerPreference: 'high-performance',
       fps: {
-        target: 120,               
+        target: 120,
         forceSetTimeOut: true,
-        smoothStep: true           
+        smoothStep: true
       },
       scale: {
         mode      : Phaser.Scale.FIT,
@@ -551,22 +817,26 @@ export class GameComponent implements OnInit, OnDestroy {
 
           scene.add.tileSprite(400, 300, 800, 600, 'spaceBg');
 
-          /* ── Walls (Rounded & Neon Glow) ── */
+          /* ── Walls (Red-Blue Neon Glow) ── */
           walls = scene.physics.add.staticGroup();
 
-          const createWall = (x: number, y: number, w: number, h: number) => {
-            const key = `neonWall_${w}_${h}`;
+          const createWall = (x: number, y: number, w: number, h: number, isBlue: boolean = false) => {
+            const key = `neonWall_${w}_${h}_${isBlue ? 'b' : 'r'}`;
             if (!scene.textures.exists(key)) {
               const graphics = scene.make.graphics({ x: 0, y: 0, add: false });
-              
-              graphics.lineStyle(6, 0x0ea5e9, 0.4);
-              graphics.strokeRoundedRect(3, 3, w - 6, h - 6, 12);
-              
-              graphics.fillStyle(0x0284c7, 0.2);
-              graphics.fillRoundedRect(3, 3, w - 6, h - 6, 12);
-              
-              graphics.lineStyle(2, 0x38bdf8, 1);
-              graphics.strokeRoundedRect(6, 6, w - 12, h - 12, 8);
+
+              const outerColor = isBlue ? 0x3060cc : 0xb02020;
+              const fillColor  = isBlue ? 0x1a3a99 : 0x7a1515;
+              const innerColor = isBlue ? 0x6090ff : 0xe05050;
+
+              graphics.lineStyle(6, outerColor, 0.35);
+              graphics.strokeRoundedRect(3, 3, w - 6, h - 6, 10);
+
+              graphics.fillStyle(fillColor, 0.18);
+              graphics.fillRoundedRect(3, 3, w - 6, h - 6, 10);
+
+              graphics.lineStyle(1.5, innerColor, 0.8);
+              graphics.strokeRoundedRect(6, 6, w - 12, h - 12, 6);
 
               graphics.generateTexture(key, w, h);
             }
@@ -575,29 +845,30 @@ export class GameComponent implements OnInit, OnDestroy {
             walls.add(wall);
           };
 
-          createWall(400, 50,  700, 20); // Top
-          createWall(400, 550, 700, 20); // Bottom
-          createWall(50,  300, 20, 500); // Left
-          createWall(750, 300, 20, 500); // Right
+          /* Outer boundary walls — red tint */
+          createWall(400, 50,  700, 20, false);
+          createWall(400, 550, 700, 20, false);
+          createWall(50,  300, 20, 500, false);
+          createWall(750, 300, 20, 500, false);
 
-          createWall(250, 300, 150, 20); // Center-Left Small Wall
-          createWall(550, 300, 150, 20); // Center-Right Small Wall
-
+          /* Interior walls — blue tint */
+          createWall(250, 300, 150, 20, true);
+          createWall(550, 300, 150, 20, true);
 
           /* ── Touch Buttons (Glass UI) - ONLY FOR MOBILE ── */
           if (!scene.sys.game.device.os.desktop) {
             const createBtn = (x: number, y: number, text: string) => {
               const container = scene.add.container(x, y).setScrollFactor(0).setDepth(20);
-              
+
               const bg = scene.add.graphics();
-              bg.fillStyle(0x0f172a, 0.7);
-              bg.lineStyle(2, 0x0ea5e9, 0.8);
-              bg.fillRoundedRect(0, 0, 70, 70, 16);
-              bg.strokeRoundedRect(0, 0, 70, 70, 16);
-              
+              bg.fillStyle(0x080818, 0.75);
+              bg.lineStyle(1.5, 0xb02020, 0.7);
+              bg.fillRoundedRect(0, 0, 70, 70, 14);
+              bg.strokeRoundedRect(0, 0, 70, 70, 14);
+
               const icon = scene.add.text(35, 35, text, { fontSize: '35px' }).setOrigin(0.5);
               container.add([bg, icon]);
-              
+
               const hitArea = scene.add.rectangle(35, 35, 70, 70, 0x000000, 0).setInteractive();
               container.add(hitArea);
 
@@ -639,26 +910,40 @@ export class GameComponent implements OnInit, OnDestroy {
             repeat   : -1
           });
 
-          /* ── Scoreboard ── */
+          /* ── Scoreboard (Red-Blue Glass Panel) ── */
           const scoreBg = scene.add.graphics();
-          scoreBg.fillStyle(0x0f172a, 0.7);
-          scoreBg.lineStyle(1, 0x0ea5e9, 0.5);
-          scoreBg.fillRoundedRect(16, 16, 180, 85, 10);
-          scoreBg.strokeRoundedRect(16, 16, 180, 85, 10);
+          /* Outer fill */
+          scoreBg.fillStyle(0x080818, 0.78);
+          scoreBg.fillRoundedRect(16, 16, 186, 88, 12);
+          /* Red accent border */
+          scoreBg.lineStyle(1, 0xb02020, 0.55);
+          scoreBg.strokeRoundedRect(16, 16, 186, 88, 12);
+          /* Blue inner line */
+          scoreBg.lineStyle(1, 0x3060cc, 0.3);
+          scoreBg.strokeRoundedRect(19, 19, 180, 82, 10);
           scoreBg.setDepth(9).setScrollFactor(0);
 
-          scoreText = scene.add.text(24, 24, 'Connecting...', {
-            fontSize        : '15px',
-            fontFamily      : 'Rajdhani, sans-serif',
-            fill            : '#38bdf8',
-            fontStyle       : 'bold',
-            lineSpacing     : 4
+          scoreText = scene.add.text(26, 26, 'Connecting...', {
+            fontSize   : '14px',
+            fontFamily : 'Rajdhani, sans-serif',
+            fill       : '#e08080',
+            fontStyle  : 'bold',
+            lineSpacing: 5
           }).setDepth(10);
 
-          scene.add.text(16, scene.scale.height - 30, `Room: ${roomName}`, {
-            fontSize  : '14px',
+          /* Room label */
+          const roomBg = scene.add.graphics();
+          roomBg.fillStyle(0x080818, 0.7);
+          roomBg.fillRoundedRect(14, scene.scale.height - 36, 140, 24, 6);
+          roomBg.lineStyle(1, 0x3060cc, 0.4);
+          roomBg.strokeRoundedRect(14, scene.scale.height - 36, 140, 24, 6);
+          roomBg.setScrollFactor(0).setDepth(9);
+
+          scene.add.text(22, scene.scale.height - 30, `◈ Room: ${roomName}`, {
+            fontSize  : '13px',
             fontFamily: 'Rajdhani, sans-serif',
-            fill      : '#94a3b8'
+            fill      : '#6090ff',
+            fontStyle : 'bold'
           }).setScrollFactor(0).setDepth(10);
 
           /* ── Init Inputs ── */
@@ -673,7 +958,7 @@ export class GameComponent implements OnInit, OnDestroy {
             const lines = Object.values(players)
               .sort((a, b) => b.score - a.score)
               .map(p => {
-                const tag = p.playerId === socket.id ? '(You)' : '';
+                const tag = p.playerId === socket.id ? ' (You)' : '';
                 return `${p.playerName}${tag} : ${p.score}`;
               });
             scoreText.setText(['🏆 SCORES', ...lines].join('\n'));
@@ -701,23 +986,22 @@ export class GameComponent implements OnInit, OnDestroy {
 
           socket.on('currentPlayersInRoom', ({ players }: { players: Record<string, PlayerState> }) => {
             if (player) { player.destroy(); player = null; }
-            
-            // OPTIMIZED: Clear the map
+
             Object.values(otherPlayersMap).forEach(p => p.destroy());
             otherPlayersMap = {};
 
             Object.values(players).forEach(pData => {
               if (pData.playerId === socket.id) {
                 player = scene.physics.add.sprite(pData.x, pData.y, 'player');
-                player.setScale(0.15).setTint(0x00ff00).setDepth(5);
+                player.setScale(0.15).setTint(0xe05050).setDepth(5);
                 player.playerId = pData.playerId;
                 scene.physics.add.collider(player, walls);
                 registerStarOverlap(scene);
               } else {
                 const other = scene.physics.add.sprite(pData.x, pData.y, 'player');
-                other.setScale(0.15).setTint(0xff0000).setDepth(5);
+                other.setScale(0.15).setTint(0x4a7fee).setDepth(5);
                 (other as any).playerId = pData.playerId;
-                otherPlayersMap[pData.playerId] = other; // Fast Insert
+                otherPlayersMap[pData.playerId] = other;
               }
             });
             updateScoreBoard(players);
@@ -725,9 +1009,9 @@ export class GameComponent implements OnInit, OnDestroy {
 
           socket.on('newPlayerInRoom', ({ playerInfo }: { playerInfo: PlayerState }) => {
             const other = scene.physics.add.sprite(playerInfo.x, playerInfo.y, 'player');
-            other.setScale(0.15).setTint(0xff0000).setDepth(5);
+            other.setScale(0.15).setTint(0x4a7fee).setDepth(5);
             (other as any).playerId = playerInfo.playerId;
-            otherPlayersMap[playerInfo.playerId] = other; // Fast Insert
+            otherPlayersMap[playerInfo.playerId] = other;
           });
 
           socket.on('starLocationInRoom', ({ star: starData }: { star: StarState }) => {
@@ -739,21 +1023,21 @@ export class GameComponent implements OnInit, OnDestroy {
           });
 
           socket.on('playerMovedInRoom', ({ playerInfo }: { playerInfo: PlayerState }) => {
-            const other = otherPlayersMap[playerInfo.playerId]; // OPTIMIZED: O(1) Instant Lookup
+            const other = otherPlayersMap[playerInfo.playerId];
             if (other) {
               scene.tweens.killTweensOf(other);
               scene.tweens.add({
                 targets  : other,
                 x        : playerInfo.x,
                 y        : playerInfo.y,
-                duration : 25,          // <-- Perfect Sync: Exact 25ms (Matches backend 40-Tick)
+                duration : 25,
                 ease     : 'Linear'
               });
             }
           });
 
           socket.on('playerDisconnectedInRoom', ({ playerId }: { playerId: string }) => {
-            const other = otherPlayersMap[playerId]; // OPTIMIZED: O(1) Lookup
+            const other = otherPlayersMap[playerId];
             if (other) {
               other.destroy();
               delete otherPlayersMap[playerId];
@@ -768,28 +1052,40 @@ export class GameComponent implements OnInit, OnDestroy {
             }
 
             const isWinner = winnerId === socket.id;
-            winText = scene.add.text(400, 240,
+
+            /* Win/Lose panel background */
+            const panelBg = scene.add.graphics();
+            panelBg.fillStyle(0x080818, 0.88);
+            panelBg.lineStyle(2, isWinner ? 0xc03030 : 0x3060cc, 0.7);
+            panelBg.fillRoundedRect(250, 200, 300, 150, 16);
+            panelBg.strokeRoundedRect(250, 200, 300, 150, 16);
+            panelBg.setDepth(29);
+
+            winText = scene.add.text(400, 255,
               isWinner ? '🏆 YOU WIN!' : '💀 YOU LOSE!',
               {
-                fontSize        : '56px',
-                fontFamily      : 'Orbitron, sans-serif',
-                fill            : isWinner ? '#4ade80' : '#f87171',
-                stroke          : '#000',
-                strokeThickness : 6,
-                backgroundColor : 'rgba(15, 23, 42, 0.8)',
-                padding         : { x: 20, y: 10 }
+                fontSize   : '48px',
+                fontFamily : 'Orbitron, sans-serif',
+                fill       : isWinner ? '#e05050' : '#4a7fee',
+                stroke     : '#000',
+                strokeThickness: 5,
               }
             ).setOrigin(0.5).setDepth(30);
 
             subText = scene.add.text(400, 320,
               'Restarting in 5 seconds...',
-              { fontSize: '20px', fontFamily: 'Rajdhani, sans-serif', fill: '#cbd5e1' }
+              {
+                fontSize  : '18px',
+                fontFamily: 'Rajdhani, sans-serif',
+                fill      : '#a08080',
+                fontStyle : 'bold'
+              }
             ).setOrigin(0.5).setDepth(30);
           });
 
           socket.on('gameResetInRoom', () => {
-            if (winText)  { winText.destroy();  winText  = null; }
-            if (subText)  { subText.destroy();  subText  = null; }
+            if (winText) { winText.destroy();  winText  = null; }
+            if (subText) { subText.destroy();  subText  = null; }
             scene.physics.resume();
             canCollect  = true;
             oldPosition = undefined;
@@ -810,11 +1106,11 @@ export class GameComponent implements OnInit, OnDestroy {
           const goUp    = cursors.up.isDown    || wasd.W.isDown || isTouchUp;
           const goDown  = cursors.down.isDown  || wasd.S.isDown || isTouchDown;
 
-          if (goLeft)  player.body.setVelocityX(-200);
+          if (goLeft)       player.body.setVelocityX(-200);
           else if (goRight) player.body.setVelocityX(200);
 
-          if (goUp)   player.body.setVelocityY(-200);
-          else if (goDown) player.body.setVelocityY(200);
+          if (goUp)         player.body.setVelocityY(-200);
+          else if (goDown)  player.body.setVelocityY(200);
 
           const { x, y } = player;
           const moved =
